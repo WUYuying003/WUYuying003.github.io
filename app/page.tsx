@@ -13,7 +13,10 @@ const SYMBOLS: Record<SymbolKey, { name: string; reward: string; weight: number 
 };
 
 function SymbolIcon({ kind, small = false }: { kind: SymbolKey; small?: boolean }) {
-  return <span className={`symbol symbol-${kind} ${small ? "symbol-small" : ""}`} aria-label={SYMBOLS[kind].name} />;
+  const files: Record<SymbolKey, string> = small
+    ? { jade: "jade-small.png", ingot: "ingot-small.png", coin: "progress-coin.png" }
+    : { jade: "jade-large.png", ingot: "ingot-large.png", coin: "coin-large.png" };
+  return <img className={`symbol symbol-${kind} ${small ? "symbol-small" : ""}`} src={`/assets/game/${files[kind]}`} alt={SYMBOLS[kind].name} />;
 }
 
 function blankCards(): Card[] {
@@ -134,7 +137,7 @@ export default function Home() {
                 ))}
               </div>
               <div className="reward-card">
-                <span className="gift-cube">◆</span>
+                <img className="gift-cube" src="/assets/game/gift-cube.png" alt="" />
                 <strong>{SYMBOLS[kind].reward}</strong>
               </div>
             </div>
@@ -151,7 +154,7 @@ export default function Home() {
               aria-label={card.symbol ? `已翻出${SYMBOLS[card.symbol].name}` : `翻开第${card.id + 1}张卡牌`}
             >
               <span className="card-inner">
-                <span className="card-back"><i>◇</i></span>
+                <span className="card-back" />
                 <span className="card-front">{card.symbol && <SymbolIcon kind={card.symbol} />}</span>
               </span>
             </button>
@@ -198,9 +201,9 @@ export default function Home() {
           <div className={`overlay overlay-${overlay}`}>
             {overlay === "adPrompt" && (
               <div className="modal reward-modal">
-                <div className="coin-stack">●</div>
+                <div className="coin-stack" />
                 <h2>看广告翻转卡牌<br />并领取50金币！</h2>
-                <button className="primary-button" onClick={startAd}>翻转卡牌</button>
+                <button className="primary-button image-button" onClick={startAd}><img src="/assets/game/button-text-flip.png" alt="翻转卡牌" /></button>
                 <button className="text-button" onClick={() => { setOverlay("none"); setPendingCard(null); }}>暂不翻牌</button>
               </div>
             )}
@@ -214,16 +217,15 @@ export default function Home() {
             )}
             {overlay === "coinReward" && (
               <div className="modal reward-modal">
-                <div className="coin-stack">●</div>
+                <div className="coin-stack" />
                 <h2>获得50金币！</h2>
                 <button className="primary-button" onClick={receiveCoinReward}>领取奖励</button>
               </div>
             )}
             {overlay === "settled" && winner && (
               <div className="settlement">
-                <div className="confetti" aria-hidden="true">◆ · ◆ · ◆</div>
-                <span className="win-label">大奖达成！</span>
-                <h1>鸿运到账</h1>
+                <img className="confetti-image" src="/assets/game/confetti.png" alt="" />
+                <img className="jackpot-title" src="/assets/game/jackpot-title.png" alt="大奖达成，鸿运到账" />
                 <div className="winner-symbols">
                   {Array.from({ length: 4 }, (_, index) => <SymbolIcon kind={winner} key={index} />)}
                 </div>
@@ -236,13 +238,10 @@ export default function Home() {
             )}
             {overlay === "claimed" && winner && (
               <div className="claimed-screen">
-                <span className="win-label">大奖达成！</span>
-                <h1>鸿运到账</h1>
+                <img className="confetti-image" src="/assets/game/confetti.png" alt="" />
+                <img className="jackpot-title" src="/assets/game/jackpot-title.png" alt="大奖达成，鸿运到账" />
                 <div className="open-chest">
-                  <div className="chest-light" />
-                  <SymbolIcon kind={winner} />
-                  <SymbolIcon kind={winner} />
-                  <SymbolIcon kind={winner} />
+                  <img src="/assets/game/reward-chest.png" alt="打开的奖励宝箱" />
                 </div>
                 <div className="ticket">
                   <small>✦ 奖励已领取 ✦</small>
