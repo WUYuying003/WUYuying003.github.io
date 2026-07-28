@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://wuyuying003.github.io"),
   title: "好运钱庄｜翻牌收集游戏",
   description: "看广告翻卡牌，集齐四个同款赢取奖励。",
   icons: { icon: "/favicon.svg" },
