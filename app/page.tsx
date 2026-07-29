@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 type SymbolKey = "jade" | "ingot" | "coin";
 type Card = { id: number; symbol: SymbolKey | null };
-type Overlay = "none" | "adPrompt" | "adPlaying" | "coinReward" | "settled" | "claimed" | "rules";
+type Overlay = "none" | "adPrompt" | "coinReward" | "settled" | "claimed" | "rules";
 
 const SYMBOLS: Record<SymbolKey, { name: string; reward: string; weight: number }> = {
   jade: { name: "玉如意", reward: "100KB", weight: 0.065165 },
@@ -47,7 +47,6 @@ export default function Home() {
   const [sessionCoins, setSessionCoins] = useState(0);
   const [adRequests, setAdRequests] = useState(0);
   const [adSuccess, setAdSuccess] = useState(0);
-  const [skipAd, setSkipAd] = useState(false);
   const [failNext, setFailNext] = useState(false);
   const [nextSymbol, setNextSymbol] = useState<"random" | SymbolKey>("random");
   const [debugOpen, setDebugOpen] = useState(false);
@@ -83,12 +82,7 @@ export default function Home() {
       window.setTimeout(() => setToast(""), 2200);
       return;
     }
-    if (skipAd) {
-      finishAd();
-      return;
-    }
-    setOverlay("adPlaying");
-    window.setTimeout(finishAd, 1600);
+    finishAd();
   }
 
   function finishAd() {
@@ -179,7 +173,6 @@ export default function Home() {
         {debugOpen && (
           <aside className="debug-panel">
             <div className="debug-title"><b>测试控制台</b><button onClick={() => setDebugOpen(false)}>×</button></div>
-            <label><input type="checkbox" checked={skipAd} onChange={(event) => setSkipAd(event.target.checked)} /> 跳过模拟广告</label>
             <label>指定下一张
               <select value={nextSymbol} onChange={(event) => setNextSymbol(event.target.value as "random" | SymbolKey)}>
                 <option value="random">随机</option>
@@ -214,14 +207,6 @@ export default function Home() {
                 <div className="coin-stack" />
                 <h2>看广告翻转卡牌<br />并领取50金币！</h2>
                 <button className="primary-button image-button" onClick={startAd}><img src="/assets/game/button-text-flip.png" alt="翻转卡牌" /></button>
-              </div>
-            )}
-            {overlay === "adPlaying" && (
-              <div className="ad-screen">
-                <span className="ad-tag">模拟广告</span>
-                <div className="ad-spinner" />
-                <h2>好运正在赶来…</h2>
-                <p>完整观看后即可翻牌</p>
               </div>
             )}
             {overlay === "coinReward" && (

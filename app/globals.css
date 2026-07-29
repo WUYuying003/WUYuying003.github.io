@@ -163,10 +163,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .rules-modal li { margin: 12px 0; line-height:1.5; }
 .rules-modal .primary-button { display:block; margin:20px auto 0; }
 
-.ad-screen { text-align:center; color:#fff0c8; }
-.ad-tag { display:inline-block; padding:5px 10px; border:1px solid #ffe6ae; border-radius:20px; font-size:12px; }
-.ad-spinner { width:70px; height:70px; margin:28px auto; border:7px solid #6f582f; border-top-color:#ffd669; border-radius:50%; animation:spin .8s linear infinite; }
-
 .settlement, .claimed-screen { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; padding-top:11%; text-align:center; color:#ffe38a; background:radial-gradient(circle at 50% 40%,rgba(126,88,28,.2),transparent 35%); }
 .win-label { padding:7px 25px; color:#a23d1b; background:#fff0c3; border:4px solid #d98d35; font-size:24px; font-weight:900; transform:rotate(-2deg); }
 .settlement h1, .claimed-screen h1 { margin:5px 0 14px; font:900 50px serif; letter-spacing:.08em; color:#ffd56a; text-shadow:0 4px #72310b, 3px 0 #b96e1e; }
@@ -189,7 +185,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .debug-stats { display:grid; grid-template-columns:repeat(2,1fr); gap:5px; margin-top:10px; color:#d7c69c; }
 .toast { position:absolute; z-index:80; left:50%; bottom:16%; transform:translateX(-50%); width:max-content; max-width:85%; padding:10px 16px; color:#fff2c8; background:#26170de8; border-radius:30px; font-size:13px; }
 
-@keyframes spin { to { transform:rotate(360deg); } }
 @keyframes float { to { transform:translateY(-16px) rotate(4deg); } }
 @keyframes pulse { to { opacity:.45; transform:scale(1.15); } }
 @keyframes confetti { 50% { transform:translateY(30px) rotate(5deg); opacity:.6; } }
@@ -286,11 +281,11 @@ button { -webkit-tap-highlight-color: transparent; }
   width: 97%;
   max-width: 650px;
   min-height: 0;
-  aspect-ratio: 650 / 721;
-  padding: 50% 11% 6%;
+  aspect-ratio: 647 / 759;
+  padding: 61% 11% 5%;
   border: 0;
   border-radius: 0;
-  background: url("/assets/game/ad-modal.png?v=20260729b") center / contain no-repeat;
+  background: url("/assets/game/ad-modal.png?v=20260729c") center / contain no-repeat;
   box-shadow: none;
   transform: translateY(4%);
 }
@@ -299,7 +294,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .modal-close {
   position: absolute;
   z-index: 3;
-  top: 19%;
+  top: 27%;
   right: 3.5%;
   width: 10%;
   aspect-ratio: 1;
