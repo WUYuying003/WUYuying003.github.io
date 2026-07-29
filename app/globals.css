@@ -212,7 +212,7 @@ button { -webkit-tap-highlight-color: transparent; }
 
 /* Production art layer — every URL below maps 1:1 to a replaceable Figma export. */
 .phone-shell {
-  background: #f5c477 url("/assets/game/board-bg.png") center top / 100% 100% no-repeat;
+  background: #f5c477 url("/assets/game/board-bg.png?v=20260729b") center top / 100% 100% no-repeat;
 }
 .phone-shell::before, .ambient, .roof, .portrait, .title-plaque, .bank-header p { display: none; }
 .bank-header { height: 23.8%; min-height: 0; padding: 0; background: transparent; }
@@ -290,7 +290,7 @@ button { -webkit-tap-highlight-color: transparent; }
   padding: 50% 11% 6%;
   border: 0;
   border-radius: 0;
-  background: url("/assets/game/ad-modal.png") center / contain no-repeat;
+  background: url("/assets/game/ad-modal.png?v=20260729b") center / contain no-repeat;
   box-shadow: none;
   transform: translateY(4%);
 }
