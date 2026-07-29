@@ -23,6 +23,21 @@ function blankCards(): Card[] {
   return Array.from({ length: 12 }, (_, id) => ({ id, symbol: null }));
 }
 
+function FinalCardGrid({ cards, winner, dimmed = false }: { cards: Card[]; winner: SymbolKey; dimmed?: boolean }) {
+  return (
+    <div className={`final-card-grid ${dimmed ? "is-dimmed" : ""}`} aria-hidden="true">
+      {cards.map((card) => (
+        <span
+          className={`final-card ${card.symbol === winner ? "is-winner" : ""} ${card.symbol ? "has-symbol" : ""}`}
+          key={card.id}
+        >
+          {card.symbol && <SymbolIcon kind={card.symbol} />}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function Home() {
   const [cards, setCards] = useState<Card[]>(blankCards);
   const [counts, setCounts] = useState<Record<SymbolKey, number>>({ jade: 0, ingot: 0, coin: 0 });
@@ -161,18 +176,6 @@ export default function Home() {
           ))}
         </section>
 
-        <footer className="counter-strip">
-          <span>金币 <b>{sessionCoins}</b></span>
-          <span>已翻 <b>{flips}</b>/12</span>
-          <span>广告 <b>{adSuccess}</b></span>
-        </footer>
-
-        <div className="counter-scene" aria-hidden="true">
-          <div className="coin-pile">◎ ◎</div>
-          <div className="treasure-chest"><span>如意</span></div>
-          <div className="money-bag">福</div>
-        </div>
-
         {debugOpen && (
           <aside className="debug-panel">
             <div className="debug-title"><b>测试控制台</b><button onClick={() => setDebugOpen(false)}>×</button></div>
@@ -201,10 +204,16 @@ export default function Home() {
           <div className={`overlay overlay-${overlay}`}>
             {overlay === "adPrompt" && (
               <div className="modal reward-modal">
+                <button
+                  className="modal-close"
+                  onClick={() => { setOverlay("none"); setPendingCard(null); }}
+                  aria-label="关闭弹窗，不看广告"
+                >
+                  <img src="/assets/game/close.png" alt="" />
+                </button>
                 <div className="coin-stack" />
                 <h2>看广告翻转卡牌<br />并领取50金币！</h2>
                 <button className="primary-button image-button" onClick={startAd}><img src="/assets/game/button-text-flip.png" alt="翻转卡牌" /></button>
-                <button className="text-button" onClick={() => { setOverlay("none"); setPendingCard(null); }}>暂不翻牌</button>
               </div>
             )}
             {overlay === "adPlaying" && (
@@ -226,9 +235,7 @@ export default function Home() {
               <div className="settlement">
                 <img className="confetti-image" src="/assets/game/confetti.png" alt="" />
                 <img className="jackpot-title" src="/assets/game/jackpot-title.png" alt="大奖达成，鸿运到账" />
-                <div className="winner-symbols">
-                  {Array.from({ length: 4 }, (_, index) => <SymbolIcon kind={winner} key={index} />)}
-                </div>
+                <FinalCardGrid cards={cards} winner={winner} />
                 <div className="ticket">
                   <small>✦ 恭喜获得 ✦</small>
                   <strong>{SYMBOLS[winner].reward}</strong>
@@ -240,13 +247,14 @@ export default function Home() {
               <div className="claimed-screen">
                 <img className="confetti-image" src="/assets/game/confetti.png" alt="" />
                 <img className="jackpot-title" src="/assets/game/jackpot-title.png" alt="大奖达成，鸿运到账" />
+                <FinalCardGrid cards={cards} winner={winner} dimmed />
                 <div className="open-chest">
                   <img src="/assets/game/reward-chest.png" alt="打开的奖励宝箱" />
                 </div>
                 <div className="ticket">
-                  <small>✦ 奖励已领取 ✦</small>
+                  <small>✦ 恭喜获得 ✦</small>
                   <strong>{SYMBOLS[winner].reward}</strong>
-                  <button className="primary-button" onClick={resetGame}>再来一局</button>
+                  <button className="primary-button" onClick={resetGame}>领取奖励</button>
                 </div>
               </div>
             )}
