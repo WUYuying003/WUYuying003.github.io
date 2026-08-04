@@ -16,13 +16,14 @@ type FlyAnimation = {
   toY: number;
 };
 
-const SYMBOLS: Record<SymbolKey, { name: string; reward: string; weight: number }> = {
-  jade: { name: "玉如意", reward: "100KB", weight: 0.22 },
-  ingot: { name: "金元宝", reward: "1KB", weight: 0.33 },
-  coin: { name: "方孔金币", reward: "600金币", weight: 0.45 },
+const SYMBOLS: Record<SymbolKey, { name: string; reward: string }> = {
+  jade: { name: "玉如意", reward: "100KB" },
+  ingot: { name: "金元宝", reward: "1KB" },
+  coin: { name: "方孔金币", reward: "600金币" },
 };
 
 const INTRO_SEQUENCE: SymbolKey[] = ["coin", "ingot", "jade"];
+const DECK_COPIES_PER_SYMBOL = 4;
 const WINNER_ROW_DURATION_MS = 3200;
 const CELEBRATION_DURATION_MS = 1000;
 
@@ -38,13 +39,25 @@ function blankCards(): Card[] {
 }
 
 function buildFinalCards(cards: Card[], winner: SymbolKey): Array<{ id: number; symbol: SymbolKey; state: FinalCardState }> {
-  const alternatives = (["jade", "ingot", "coin"] as SymbolKey[]).filter((symbol) => symbol !== winner);
+  const symbols: SymbolKey[] = ["jade", "ingot", "coin"];
+  const revealedCounts: Record<SymbolKey, number> = { jade: 0, ingot: 0, coin: 0 };
+  cards.forEach((card) => {
+    if (card.symbol) revealedCounts[card.symbol] += 1;
+  });
+  const hiddenSymbols = symbols.flatMap((symbol) =>
+    Array.from(
+      { length: Math.max(0, DECK_COPIES_PER_SYMBOL - revealedCounts[symbol]) },
+      () => symbol,
+    ),
+  );
+  let hiddenIndex = 0;
+
   return cards.map((card) => {
     if (card.symbol === winner) return { id: card.id, symbol: winner, state: "winner" };
     if (card.symbol) return { id: card.id, symbol: card.symbol, state: "opened" };
     return {
       id: card.id,
-      symbol: alternatives[card.id % alternatives.length],
+      symbol: hiddenSymbols[hiddenIndex++],
       state: "unopened",
     };
   });
@@ -154,11 +167,23 @@ export default function Home() {
       return chosen;
     }
     if (flipIndex < INTRO_SEQUENCE.length) return INTRO_SEQUENCE[flipIndex];
+
+    const remaining = {
+      jade: DECK_COPIES_PER_SYMBOL - counts.jade,
+      ingot: DECK_COPIES_PER_SYMBOL - counts.ingot,
+      coin: DECK_COPIES_PER_SYMBOL - counts.coin,
+    };
+    const weights: Record<SymbolKey, number> = {
+      jade: remaining.jade <= 0 ? 0 : counts.jade >= 3 ? 0.003 : 3 * remaining.jade,
+      ingot: remaining.ingot <= 0 ? 0 : counts.ingot >= 3 ? 0.05 : 0.8 * remaining.ingot,
+      coin: Math.max(0, remaining.coin),
+    };
+    const totalWeight = weights.jade + weights.ingot + weights.coin;
     const randomValue = new Uint32Array(1);
     window.crypto.getRandomValues(randomValue);
-    const value = randomValue[0] / 0x100000000;
-    if (value < SYMBOLS.jade.weight) return "jade";
-    if (value < SYMBOLS.jade.weight + SYMBOLS.ingot.weight) return "ingot";
+    const value = (randomValue[0] / 0x100000000) * totalWeight;
+    if (value < weights.jade) return "jade";
+    if (value < weights.jade + weights.ingot) return "ingot";
     return "coin";
   }
 
@@ -210,7 +235,7 @@ export default function Home() {
       window.setTimeout(() => setFlyAnimation(null), 980);
     }
 
-    playSound(symbol === "coin" ? "flip-small.mp3" : "flip-major.mp3");
+    playSound(symbol === "jade" ? "flip-jade.mp3" : symbol === "ingot" ? "flip-major.mp3" : "flip-small.mp3");
     setSessionCoins((value) => value + 50);
     setCards((current) => current.map((card) => card.id === cardId ? { ...card, symbol } : card));
     setCounts((current) => ({ ...current, [symbol]: nextCount }));
