@@ -261,7 +261,7 @@ export default function Home() {
     if (nextCount >= 4) {
       setWinner(symbol);
       setDebugOpen(false);
-      playRewardSound(symbol === "jade" ? "reward-100k.mp3" : symbol === "ingot" ? "reward-1k.wav" : "reward-600.mp3");
+      playRewardSound(symbol === "jade" ? "reward-100k.mp3" : symbol === "ingot" ? "reward-600.mp3" : "reward-1k.wav");
       settlementTimerRef.current = window.setTimeout(() => {
         settlementTimerRef.current = null;
         if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
