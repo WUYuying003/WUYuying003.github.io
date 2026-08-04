@@ -57,7 +57,15 @@ function FinalCardGrid({ cards, winner, dimmed = false }: { cards: Card[]; winne
           className={`final-card is-${card.state}`}
           key={card.id}
         >
-          <SymbolIcon kind={card.symbol} />
+          {card.state === "winner" ? (
+            <SymbolIcon kind={card.symbol} />
+          ) : (
+            <img
+              className="final-card-art"
+              src={`/assets/game/result-cards/${card.state}-${card.symbol}.png`}
+              alt=""
+            />
+          )}
         </span>
       ))}
     </div>

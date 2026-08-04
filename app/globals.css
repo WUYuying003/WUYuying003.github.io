@@ -396,7 +396,7 @@ button { -webkit-tap-highlight-color: transparent; }
   margin-inline: auto;
   line-height: 0;
 }
-.image-button img { display: block; width: 78%; height: auto; margin: 0; object-fit: contain; object-position: center; }
+.reward-modal .image-button img { display: block; width: 57%; height: auto; margin: 0; object-fit: contain; object-position: center; }
 
 .overlay-settled, .overlay-claimed { padding: 0; background: rgba(12, 8, 4, .82); }
 .settlement, .claimed-screen {
@@ -453,21 +453,19 @@ button { -webkit-tap-highlight-color: transparent; }
   box-shadow: inset 0 0 13px rgba(255,244,142,.75), 0 0 11px #ffd84e;
   pointer-events: none;
 }
-.final-card.is-opened { filter: brightness(.55) saturate(.75); }
-.final-card.is-unopened { filter: brightness(.66) saturate(.55) sepia(.18); }
-.final-card.is-opened::after,
-.final-card.is-unopened::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
+.final-card.is-opened,
+.final-card.is-unopened { overflow: visible; background: transparent; }
+.final-card-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  opacity: 1;
+  filter: none;
 }
-.final-card.is-opened::after { background: rgba(27, 19, 8, .12); }
-.final-card.is-unopened::after { background: rgba(191, 160, 91, .24); }
 .final-card .symbol { width: 76%; height: 78%; object-fit: contain; }
 .final-card .symbol-jade { width: 67%; height: 84%; }
-.final-card.is-opened .symbol { opacity: .72; }
-.final-card.is-unopened .symbol { opacity: .42; }
 .final-card-grid.is-dimmed { opacity: .26; filter: brightness(.55); }
 .ticket {
   position: absolute;
