@@ -41,8 +41,11 @@ test("keeps the requested draw rules and jade sound", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 
   assert.match(page, /INTRO_SEQUENCE: SymbolKey\[\] = \["coin", "ingot", "jade"\]/);
-  assert.match(page, /counts\.jade >= 3 \? 0\.003 : 3 \* remaining\.jade/);
-  assert.match(page, /counts\.ingot >= 3 \? 0\.05 : 0\.8 \* remaining\.ingot/);
+  assert.match(page, /JADE_CAP_WEIGHT = 0\.0015/);
+  assert.match(page, /INGOT_CAP_WEIGHT = 0\.05/);
+  assert.match(page, /COIN_BASE_WEIGHT_MULTIPLIER = 2\.7/);
+  assert.match(page, /REPEAT_WEIGHT_MULTIPLIER = 0\.3/);
+  assert.match(page, /lastSymbol === previousSymbol\s*\? 0/);
   assert.match(page, /DECK_COPIES_PER_SYMBOL - revealedCounts\[symbol\]/);
   assert.match(page, /symbol === "jade" \? "flip-jade\.mp3"/);
   await access(new URL("../public/assets/game/audio/flip-jade.mp3", import.meta.url));

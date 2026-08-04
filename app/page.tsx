@@ -24,6 +24,10 @@ const SYMBOLS: Record<SymbolKey, { name: string; reward: string }> = {
 
 const INTRO_SEQUENCE: SymbolKey[] = ["coin", "ingot", "jade"];
 const DECK_COPIES_PER_SYMBOL = 4;
+const REPEAT_WEIGHT_MULTIPLIER = 0.3;
+const COIN_BASE_WEIGHT_MULTIPLIER = 2.7;
+const JADE_CAP_WEIGHT = 0.0015;
+const INGOT_CAP_WEIGHT = 0.05;
 const WINNER_ROW_DURATION_MS = 3200;
 const CELEBRATION_DURATION_MS = 1000;
 
@@ -111,6 +115,7 @@ export default function Home() {
   const settlementTimerRef = useRef<number | null>(null);
   const celebrationTimerRef = useRef<number | null>(null);
   const flyIdRef = useRef(0);
+  const drawHistoryRef = useRef<SymbolKey[]>([]);
 
   const flips = useMemo(() => cards.filter((card) => card.symbol).length, [cards]);
 
@@ -174,10 +179,17 @@ export default function Home() {
       coin: DECK_COPIES_PER_SYMBOL - counts.coin,
     };
     const weights: Record<SymbolKey, number> = {
-      jade: remaining.jade <= 0 ? 0 : counts.jade >= 3 ? 0.003 : 3 * remaining.jade,
-      ingot: remaining.ingot <= 0 ? 0 : counts.ingot >= 3 ? 0.05 : 0.8 * remaining.ingot,
-      coin: Math.max(0, remaining.coin),
+      jade: remaining.jade <= 0 ? 0 : counts.jade >= 3 ? JADE_CAP_WEIGHT : 3 * remaining.jade,
+      ingot: remaining.ingot <= 0 ? 0 : counts.ingot >= 3 ? INGOT_CAP_WEIGHT : 0.8 * remaining.ingot,
+      coin: COIN_BASE_WEIGHT_MULTIPLIER * Math.max(0, remaining.coin),
     };
+    const lastSymbol = drawHistoryRef.current.at(-1);
+    const previousSymbol = drawHistoryRef.current.at(-2);
+    if (lastSymbol) {
+      weights[lastSymbol] = lastSymbol === previousSymbol
+        ? 0
+        : weights[lastSymbol] * REPEAT_WEIGHT_MULTIPLIER;
+    }
     const totalWeight = weights.jade + weights.ingot + weights.coin;
     const randomValue = new Uint32Array(1);
     window.crypto.getRandomValues(randomValue);
@@ -217,6 +229,7 @@ export default function Home() {
 
   function revealCard(cardId: number) {
     const symbol = chooseSymbol(flips);
+    drawHistoryRef.current.push(symbol);
     const nextCount = counts[symbol] + 1;
     const shellRect = shellRef.current?.getBoundingClientRect();
     const cardRect = cardRefs.current[cardId]?.getBoundingClientRect();
@@ -281,6 +294,7 @@ export default function Home() {
     setAdSuccess(0);
     setToast("");
     setFlyAnimation(null);
+    drawHistoryRef.current = [];
   }
 
   const rows: SymbolKey[] = ["jade", "ingot", "coin"];
