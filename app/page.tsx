@@ -5,7 +5,7 @@ import type { CSSProperties } from "react";
 
 type SymbolKey = "jade" | "ingot" | "coin";
 type Card = { id: number; symbol: SymbolKey | null };
-type Overlay = "none" | "adPrompt" | "settled" | "claimed" | "rules";
+type Overlay = "none" | "adPrompt" | "celebration" | "settled" | "rules";
 type FinalCardState = "winner" | "opened" | "unopened";
 type FlyAnimation = {
   id: number;
@@ -23,6 +23,8 @@ const SYMBOLS: Record<SymbolKey, { name: string; reward: string; weight: number 
 };
 
 const INTRO_SEQUENCE: SymbolKey[] = ["coin", "ingot", "jade"];
+const WINNER_ROW_DURATION_MS = 3200;
+const CELEBRATION_DURATION_MS = 1000;
 
 function SymbolIcon({ kind, small = false }: { kind: SymbolKey; small?: boolean }) {
   const files: Record<SymbolKey, string> = small
@@ -91,8 +93,10 @@ export default function Home() {
   const cardRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const slotRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const bgmRef = useRef<HTMLAudioElement | null>(null);
+  const rewardSoundRef = useRef<HTMLAudioElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const settlementTimerRef = useRef<number | null>(null);
+  const celebrationTimerRef = useRef<number | null>(null);
   const flyIdRef = useRef(0);
 
   const flips = useMemo(() => cards.filter((card) => card.symbol).length, [cards]);
@@ -103,8 +107,10 @@ export default function Home() {
     bgmRef.current.volume = 0.28;
     return () => {
       bgmRef.current?.pause();
-      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
-      if (settlementTimerRef.current) window.clearTimeout(settlementTimerRef.current);
+      rewardSoundRef.current?.pause();
+      if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+      if (settlementTimerRef.current !== null) window.clearTimeout(settlementTimerRef.current);
+      if (celebrationTimerRef.current !== null) window.clearTimeout(celebrationTimerRef.current);
     };
   }, []);
 
@@ -118,8 +124,24 @@ export default function Home() {
     void sound.play().catch(() => undefined);
   }
 
+  function stopRewardSound() {
+    if (!rewardSoundRef.current) return;
+    rewardSoundRef.current.pause();
+    rewardSoundRef.current.currentTime = 0;
+    rewardSoundRef.current = null;
+  }
+
+  function playRewardSound(file: string) {
+    stopRewardSound();
+    const sound = new Audio(`/assets/game/audio/${file}`);
+    sound.loop = true;
+    sound.volume = 1;
+    rewardSoundRef.current = sound;
+    void sound.play().catch(() => undefined);
+  }
+
   function showToast(message: string) {
-    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
     setToast(message);
     setToastId((value) => value + 1);
     toastTimerRef.current = window.setTimeout(() => setToast(""), 5000);
@@ -197,12 +219,31 @@ export default function Home() {
     showToast("获得50金币!");
     if (nextCount >= 4) {
       setWinner(symbol);
-      playSound(symbol === "jade" ? "reward-100k.mp3" : symbol === "ingot" ? "reward-1k.wav" : "reward-600.mp3", 1);
-      settlementTimerRef.current = window.setTimeout(() => setOverlay("settled"), 3200);
+      setDebugOpen(false);
+      playRewardSound(symbol === "jade" ? "reward-100k.mp3" : symbol === "ingot" ? "reward-1k.wav" : "reward-600.mp3");
+      settlementTimerRef.current = window.setTimeout(() => {
+        settlementTimerRef.current = null;
+        if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+        setToast("");
+        setOverlay("celebration");
+        celebrationTimerRef.current = window.setTimeout(() => {
+          celebrationTimerRef.current = null;
+          stopRewardSound();
+          setOverlay("settled");
+        }, CELEBRATION_DURATION_MS);
+      }, WINNER_ROW_DURATION_MS);
     }
   }
 
   function resetGame() {
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+    if (settlementTimerRef.current !== null) window.clearTimeout(settlementTimerRef.current);
+    if (celebrationTimerRef.current !== null) window.clearTimeout(celebrationTimerRef.current);
+    toastTimerRef.current = null;
+    settlementTimerRef.current = null;
+    celebrationTimerRef.current = null;
+    stopRewardSound();
     setCards(blankCards());
     setCounts({ jade: 0, ingot: 0, coin: 0 });
     setOverlay("none");
@@ -223,13 +264,13 @@ export default function Home() {
         <div className="ambient ambient-two" />
 
         <header className="bank-header">
-          <button className="round-tool rules-tool" onClick={() => setOverlay("rules")} aria-label="查看规则">?</button>
+          <button className="round-tool rules-tool" onClick={() => setOverlay("rules")} disabled={Boolean(winner)} aria-label="查看规则">?</button>
           <div className="roof roof-left" />
           <div className="roof roof-right" />
           <div className="portrait" aria-hidden="true">♬</div>
           <div className="title-plaque">好运钱庄</div>
           <p>✦ 集齐4个同款，赢取奖励 ✦</p>
-          <button className="round-tool debug-tool" onClick={() => setDebugOpen((value) => !value)} aria-label="打开测试面板">⚙</button>
+          <button className="round-tool debug-tool" onClick={() => setDebugOpen((value) => !value)} disabled={Boolean(winner)} aria-label="打开测试面板">⚙</button>
         </header>
 
         <section className="progress-board" aria-label="奖励进度">
@@ -341,12 +382,12 @@ export default function Home() {
                 <div className="ticket">
                   <small>✦ 恭喜获得 ✦</small>
                   <strong>{SYMBOLS[winner].reward}</strong>
-                  <button className="primary-button" onClick={() => setOverlay("claimed")}>领取奖励</button>
+                  <button className="primary-button" onClick={resetGame}>领取奖励</button>
                 </div>
               </div>
             )}
-            {overlay === "claimed" && winner && (
-              <div className="claimed-screen">
+            {overlay === "celebration" && winner && (
+              <div className="celebration-screen">
                 <img className="confetti-image" src="/assets/game/confetti.png" alt="" />
                 <img className="jackpot-title" src="/assets/game/jackpot-title.png" alt="大奖达成，鸿运到账" />
                 <FinalCardGrid cards={cards} winner={winner} dimmed />
@@ -356,7 +397,6 @@ export default function Home() {
                 <div className="ticket">
                   <small>✦ 恭喜获得 ✦</small>
                   <strong>{SYMBOLS[winner].reward}</strong>
-                  <button className="primary-button" onClick={resetGame}>领取奖励</button>
                 </div>
               </div>
             )}
