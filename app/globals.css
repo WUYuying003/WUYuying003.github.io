@@ -192,9 +192,9 @@ button { -webkit-tap-highlight-color: transparent; }
 .coin-toast {
   position: absolute;
   z-index: 85;
-  top: 18.2%;
-  left: 2%;
-  width: 96%;
+  top: 2.8%;
+  left: 4%;
+  width: 92%;
   pointer-events: none;
   filter: drop-shadow(0 8px 12px rgba(91,43,6,.35));
   animation: toastDrop 5s cubic-bezier(.18,.85,.25,1) both;
@@ -267,6 +267,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .progress-row.progress-winner {
   position: relative;
   isolation: isolate;
+  grid-template-columns: 56% 44%;
   background-image: url("/assets/game/progress-complete.png");
   animation: winnerRowPulse .74s ease-in-out 4 alternate;
   filter: brightness(1.15) saturate(1.25);
@@ -299,10 +300,13 @@ button { -webkit-tap-highlight-color: transparent; }
   background: transparent;
   box-shadow: none;
 }
-.slots { padding: 0; gap: 4px; }
-.slot { height: 51px; background: transparent; box-shadow: none; }
+.slots { min-width: 0; padding: 1px 4px 1px 2px; gap: 2px; }
+.slot { min-width: 0; height: 49px; overflow: hidden; background: transparent; box-shadow: none; }
 .slot-filled { background: transparent; box-shadow: none; }
-.slot .symbol-small { max-width: 45px; max-height: 45px; }
+.slot .symbol-small { width: 82%; height: 82%; max-width: 42px; max-height: 42px; margin: auto; object-fit: contain; }
+.slot .symbol-ingot.symbol-small { width: 78%; height: 72%; transform: translateX(-1px); }
+.slot .symbol-jade.symbol-small { width: 70%; height: 86%; }
+.slot .symbol-coin.symbol-small { width: 76%; height: 76%; }
 .reward-card {
   grid-template-columns: 38px 1fr;
   padding: 0 7px 0 13px;
@@ -373,13 +377,26 @@ button { -webkit-tap-highlight-color: transparent; }
 .modal-close img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .primary-button {
   position: relative;
+  display: grid;
+  place-items: center;
   border: 0;
   border-radius: 0;
   color: #ffe5a4;
   background: url("/assets/game/green-button.png") center / 100% 100% no-repeat;
   box-shadow: none;
 }
-.image-button img { width: 80%; height: 38px; object-fit: contain; }
+.reward-modal .image-button {
+  display: grid;
+  place-items: center;
+  width: 70%;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: 406 / 123;
+  padding: 0;
+  margin-inline: auto;
+  line-height: 0;
+}
+.image-button img { display: block; width: 78%; height: auto; margin: 0; object-fit: contain; object-position: center; }
 
 .overlay-settled, .overlay-claimed { padding: 0; background: rgba(12, 8, 4, .82); }
 .settlement, .claimed-screen {
@@ -420,17 +437,37 @@ button { -webkit-tap-highlight-color: transparent; }
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: url("/assets/game/card-back.png") center / 100% 100% no-repeat;
-  filter: brightness(.38);
+  background: url("/assets/game/card-front.png") center / 100% 100% no-repeat;
 }
-.final-card.has-symbol { background-image: url("/assets/game/card-front.png"); }
 .final-card.is-winner {
   z-index: 2;
-  filter: brightness(1.08) drop-shadow(0 0 7px #fff087);
+  filter: brightness(1.14) saturate(1.12) drop-shadow(0 0 7px #fff087);
   animation: winningCard 1s infinite alternate;
 }
+.final-card.is-winner::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 2px solid rgba(255, 230, 106, .9);
+  border-radius: 10px;
+  box-shadow: inset 0 0 13px rgba(255,244,142,.75), 0 0 11px #ffd84e;
+  pointer-events: none;
+}
+.final-card.is-opened { filter: brightness(.55) saturate(.75); }
+.final-card.is-unopened { filter: brightness(.66) saturate(.55) sepia(.18); }
+.final-card.is-opened::after,
+.final-card.is-unopened::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.final-card.is-opened::after { background: rgba(27, 19, 8, .12); }
+.final-card.is-unopened::after { background: rgba(191, 160, 91, .24); }
 .final-card .symbol { width: 76%; height: 78%; object-fit: contain; }
 .final-card .symbol-jade { width: 67%; height: 84%; }
+.final-card.is-opened .symbol { opacity: .72; }
+.final-card.is-unopened .symbol { opacity: .42; }
 .final-card-grid.is-dimmed { opacity: .26; filter: brightness(.55); }
 .ticket {
   position: absolute;

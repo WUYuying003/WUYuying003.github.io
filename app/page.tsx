@@ -6,6 +6,7 @@ import type { CSSProperties } from "react";
 type SymbolKey = "jade" | "ingot" | "coin";
 type Card = { id: number; symbol: SymbolKey | null };
 type Overlay = "none" | "adPrompt" | "settled" | "claimed" | "rules";
+type FinalCardState = "winner" | "opened" | "unopened";
 type FlyAnimation = {
   id: number;
   symbol: SymbolKey;
@@ -16,10 +17,12 @@ type FlyAnimation = {
 };
 
 const SYMBOLS: Record<SymbolKey, { name: string; reward: string; weight: number }> = {
-  jade: { name: "玉如意", reward: "100KB", weight: 0.065165 },
-  ingot: { name: "金元宝", reward: "1KB", weight: 0.161553 },
-  coin: { name: "方孔金币", reward: "600金币", weight: 0.773282 },
+  jade: { name: "玉如意", reward: "100KB", weight: 0.22 },
+  ingot: { name: "金元宝", reward: "1KB", weight: 0.33 },
+  coin: { name: "方孔金币", reward: "600金币", weight: 0.45 },
 };
+
+const INTRO_SEQUENCE: SymbolKey[] = ["coin", "ingot", "jade"];
 
 function SymbolIcon({ kind, small = false }: { kind: SymbolKey; small?: boolean }) {
   const files: Record<SymbolKey, string> = small
@@ -32,15 +35,29 @@ function blankCards(): Card[] {
   return Array.from({ length: 12 }, (_, id) => ({ id, symbol: null }));
 }
 
+function buildFinalCards(cards: Card[], winner: SymbolKey): Array<{ id: number; symbol: SymbolKey; state: FinalCardState }> {
+  const alternatives = (["jade", "ingot", "coin"] as SymbolKey[]).filter((symbol) => symbol !== winner);
+  return cards.map((card) => {
+    if (card.symbol === winner) return { id: card.id, symbol: winner, state: "winner" };
+    if (card.symbol) return { id: card.id, symbol: card.symbol, state: "opened" };
+    return {
+      id: card.id,
+      symbol: alternatives[card.id % alternatives.length],
+      state: "unopened",
+    };
+  });
+}
+
 function FinalCardGrid({ cards, winner, dimmed = false }: { cards: Card[]; winner: SymbolKey; dimmed?: boolean }) {
+  const finalCards = buildFinalCards(cards, winner);
   return (
     <div className={`final-card-grid ${dimmed ? "is-dimmed" : ""}`} aria-hidden="true">
-      {cards.map((card) => (
+      {finalCards.map((card) => (
         <span
-          className={`final-card ${card.symbol === winner ? "is-winner" : ""} ${card.symbol ? "has-symbol" : ""}`}
+          className={`final-card is-${card.state}`}
           key={card.id}
         >
-          {card.symbol && <SymbolIcon kind={card.symbol} />}
+          <SymbolIcon kind={card.symbol} />
         </span>
       ))}
     </div>
@@ -60,6 +77,7 @@ export default function Home() {
   const [nextSymbol, setNextSymbol] = useState<"random" | SymbolKey>("random");
   const [debugOpen, setDebugOpen] = useState(false);
   const [toast, setToast] = useState("");
+  const [toastId, setToastId] = useState(0);
   const [flyAnimation, setFlyAnimation] = useState<FlyAnimation | null>(null);
   const shellRef = useRef<HTMLElement | null>(null);
   const cardRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -67,6 +85,7 @@ export default function Home() {
   const bgmRef = useRef<HTMLAudioElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const settlementTimerRef = useRef<number | null>(null);
+  const flyIdRef = useRef(0);
 
   const flips = useMemo(() => cards.filter((card) => card.symbol).length, [cards]);
 
@@ -94,16 +113,20 @@ export default function Home() {
   function showToast(message: string) {
     if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
     setToast(message);
+    setToastId((value) => value + 1);
     toastTimerRef.current = window.setTimeout(() => setToast(""), 5000);
   }
 
-  function chooseSymbol(): SymbolKey {
+  function chooseSymbol(flipIndex: number): SymbolKey {
     if (nextSymbol !== "random") {
       const chosen = nextSymbol;
       setNextSymbol("random");
       return chosen;
     }
-    const value = Math.random();
+    if (flipIndex < INTRO_SEQUENCE.length) return INTRO_SEQUENCE[flipIndex];
+    const randomValue = new Uint32Array(1);
+    window.crypto.getRandomValues(randomValue);
+    const value = randomValue[0] / 0x100000000;
     if (value < SYMBOLS.jade.weight) return "jade";
     if (value < SYMBOLS.jade.weight + SYMBOLS.ingot.weight) return "ingot";
     return "coin";
@@ -112,6 +135,10 @@ export default function Home() {
   function clickCard(id: number) {
     if (overlay !== "none" || winner || cards[id].symbol) return;
     unlockBgm();
+    if (flips < 5) {
+      revealCard(id);
+      return;
+    }
     setPendingCard(id);
     setOverlay("adPrompt");
   }
@@ -130,20 +157,20 @@ export default function Home() {
 
   function finishAd() {
     setAdSuccess((value) => value + 1);
-    revealPendingCard();
+    if (pendingCard !== null) revealCard(pendingCard);
   }
 
-  function revealPendingCard() {
-    if (pendingCard === null) return;
-    const symbol = chooseSymbol();
+  function revealCard(cardId: number) {
+    const symbol = chooseSymbol(flips);
     const nextCount = counts[symbol] + 1;
     const shellRect = shellRef.current?.getBoundingClientRect();
-    const cardRect = cardRefs.current[pendingCard]?.getBoundingClientRect();
+    const cardRect = cardRefs.current[cardId]?.getBoundingClientRect();
     const targetRect = slotRefs.current[`${symbol}-${Math.min(counts[symbol], 3)}`]?.getBoundingClientRect();
 
     if (shellRect && cardRect && targetRect) {
+      flyIdRef.current += 1;
       setFlyAnimation({
-        id: Date.now(),
+        id: flyIdRef.current,
         symbol,
         fromX: cardRect.left + cardRect.width / 2 - shellRect.left,
         fromY: cardRect.top + cardRect.height / 2 - shellRect.top,
@@ -155,7 +182,7 @@ export default function Home() {
 
     playSound(symbol === "coin" ? "flip-small.mp3" : "flip-major.mp3");
     setSessionCoins((value) => value + 50);
-    setCards((current) => current.map((card) => card.id === pendingCard ? { ...card, symbol } : card));
+    setCards((current) => current.map((card) => card.id === cardId ? { ...card, symbol } : card));
     setCounts((current) => ({ ...current, [symbol]: nextCount }));
     setPendingCard(null);
     setOverlay("none");
@@ -252,6 +279,7 @@ export default function Home() {
             <button onClick={resetGame}>重置本局</button>
             <div className="debug-stats">
               <span>翻牌 {flips}</span><span>广告 {adSuccess}/{adRequests}</span>
+              <span>免广告 {Math.max(0, 5 - flips)}</span><span>下次 {flips < 5 ? "免费" : "广告"}</span>
               <span>玉 {counts.jade}</span><span>元宝 {counts.ingot}</span><span>铜钱 {counts.coin}</span>
               <span>金币 {sessionCoins}</span>
             </div>
@@ -261,7 +289,7 @@ export default function Home() {
         {flyAnimation && (
           <div
             className="flying-symbol"
-            key={flyAnimation.id}
+            key={`fly-${flyAnimation.id}`}
             style={{
               "--fly-from-x": `${flyAnimation.fromX}px`,
               "--fly-from-y": `${flyAnimation.fromY}px`,
@@ -274,11 +302,11 @@ export default function Home() {
         )}
 
         {toast && (toast === "获得50金币!" ? (
-          <div className="coin-toast" role="status" aria-label={toast}>
+          <div className="coin-toast" key={`coin-toast-${toastId}`} role="status" aria-label={toast}>
             <img src="/assets/game/coin-toast-50.png" alt="获得50金币" />
           </div>
         ) : (
-          <div className="error-toast" role="status">{toast}</div>
+          <div className="error-toast" key={`error-toast-${toastId}`} role="status">{toast}</div>
         ))}
 
         {overlay !== "none" && (
@@ -328,7 +356,8 @@ export default function Home() {
               <div className="modal rules-modal">
                 <h2>活动规则</h2>
                 <ol>
-                  <li>点击未翻开的卡牌，完整观看广告后即可翻牌。</li>
+                  <li>前5次可直接免费翻牌，第6次起完整观看广告后即可翻牌。</li>
+                  <li>前3次必定集齐三种不同图案，第4次起进入随机抽取。</li>
                   <li>每次有效翻牌必得50金币。</li>
                   <li>同一种图案累计4个即可获得对应大奖，无需连续出现。</li>
                   <li>广告失败或中断时，不消耗卡牌，也不会发放奖励。</li>
