@@ -1,10 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 
 type SymbolKey = "jade" | "ingot" | "coin";
 type Card = { id: number; symbol: SymbolKey | null };
-type Overlay = "none" | "adPrompt" | "coinReward" | "settled" | "claimed" | "rules";
+type Overlay = "none" | "adPrompt" | "settled" | "claimed" | "rules";
+type FlyAnimation = {
+  id: number;
+  symbol: SymbolKey;
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+};
 
 const SYMBOLS: Record<SymbolKey, { name: string; reward: string; weight: number }> = {
   jade: { name: "玉如意", reward: "100KB", weight: 0.065165 },
@@ -51,8 +60,42 @@ export default function Home() {
   const [nextSymbol, setNextSymbol] = useState<"random" | SymbolKey>("random");
   const [debugOpen, setDebugOpen] = useState(false);
   const [toast, setToast] = useState("");
+  const [flyAnimation, setFlyAnimation] = useState<FlyAnimation | null>(null);
+  const shellRef = useRef<HTMLElement | null>(null);
+  const cardRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const slotRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const bgmRef = useRef<HTMLAudioElement | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+  const settlementTimerRef = useRef<number | null>(null);
 
   const flips = useMemo(() => cards.filter((card) => card.symbol).length, [cards]);
+
+  useEffect(() => {
+    bgmRef.current = new Audio("/assets/game/audio/game-bgm.mp3");
+    bgmRef.current.loop = true;
+    bgmRef.current.volume = 0.28;
+    return () => {
+      bgmRef.current?.pause();
+      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+      if (settlementTimerRef.current) window.clearTimeout(settlementTimerRef.current);
+    };
+  }, []);
+
+  function unlockBgm() {
+    if (bgmRef.current?.paused) void bgmRef.current.play().catch(() => undefined);
+  }
+
+  function playSound(file: string, volume = 0.86) {
+    const sound = new Audio(`/assets/game/audio/${file}`);
+    sound.volume = volume;
+    void sound.play().catch(() => undefined);
+  }
+
+  function showToast(message: string) {
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    setToast(message);
+    toastTimerRef.current = window.setTimeout(() => setToast(""), 5000);
+  }
 
   function chooseSymbol(): SymbolKey {
     if (nextSymbol !== "random") {
@@ -68,6 +111,7 @@ export default function Home() {
 
   function clickCard(id: number) {
     if (overlay !== "none" || winner || cards[id].symbol) return;
+    unlockBgm();
     setPendingCard(id);
     setOverlay("adPrompt");
   }
@@ -78,8 +122,7 @@ export default function Home() {
       setFailNext(false);
       setOverlay("none");
       setPendingCard(null);
-      setToast("广告播放失败，卡牌未消耗，请重试");
-      window.setTimeout(() => setToast(""), 2200);
+      showToast("广告播放失败，卡牌未消耗，请重试");
       return;
     }
     finishAd();
@@ -87,22 +130,40 @@ export default function Home() {
 
   function finishAd() {
     setAdSuccess((value) => value + 1);
-    setOverlay("coinReward");
+    revealPendingCard();
   }
 
-  function receiveCoinReward() {
+  function revealPendingCard() {
     if (pendingCard === null) return;
     const symbol = chooseSymbol();
     const nextCount = counts[symbol] + 1;
+    const shellRect = shellRef.current?.getBoundingClientRect();
+    const cardRect = cardRefs.current[pendingCard]?.getBoundingClientRect();
+    const targetRect = slotRefs.current[`${symbol}-${Math.min(counts[symbol], 3)}`]?.getBoundingClientRect();
+
+    if (shellRect && cardRect && targetRect) {
+      setFlyAnimation({
+        id: Date.now(),
+        symbol,
+        fromX: cardRect.left + cardRect.width / 2 - shellRect.left,
+        fromY: cardRect.top + cardRect.height / 2 - shellRect.top,
+        toX: targetRect.left + targetRect.width / 2 - shellRect.left,
+        toY: targetRect.top + targetRect.height / 2 - shellRect.top,
+      });
+      window.setTimeout(() => setFlyAnimation(null), 980);
+    }
+
+    playSound(symbol === "coin" ? "flip-small.mp3" : "flip-major.mp3");
     setSessionCoins((value) => value + 50);
     setCards((current) => current.map((card) => card.id === pendingCard ? { ...card, symbol } : card));
     setCounts((current) => ({ ...current, [symbol]: nextCount }));
     setPendingCard(null);
+    setOverlay("none");
+    showToast("获得50金币!");
     if (nextCount >= 4) {
       setWinner(symbol);
-      window.setTimeout(() => setOverlay("settled"), 520);
-    } else {
-      setOverlay("none");
+      playSound(symbol === "jade" ? "reward-100k.mp3" : symbol === "ingot" ? "reward-1k.wav" : "reward-600.mp3", 1);
+      settlementTimerRef.current = window.setTimeout(() => setOverlay("settled"), 3200);
     }
   }
 
@@ -115,13 +176,14 @@ export default function Home() {
     setAdRequests(0);
     setAdSuccess(0);
     setToast("");
+    setFlyAnimation(null);
   }
 
   const rows: SymbolKey[] = ["jade", "ingot", "coin"];
 
   return (
     <main className="stage">
-      <section className="phone-shell" aria-label="好运钱庄翻牌游戏">
+      <section className="phone-shell" ref={shellRef} aria-label="好运钱庄翻牌游戏">
         <div className="ambient ambient-one" />
         <div className="ambient ambient-two" />
 
@@ -140,7 +202,11 @@ export default function Home() {
             <div className={`progress-row ${winner === kind ? "progress-winner" : ""}`} key={kind}>
               <div className="slots">
                 {Array.from({ length: 4 }, (_, index) => (
-                  <div className={`slot ${index < counts[kind] ? "slot-filled" : ""}`} key={index}>
+                  <div
+                    className={`slot ${index < counts[kind] ? "slot-filled" : ""}`}
+                    key={index}
+                    ref={(node) => { slotRefs.current[`${kind}-${index}`] = node; }}
+                  >
                     {index < counts[kind] && <SymbolIcon kind={kind} small />}
                   </div>
                 ))}
@@ -158,6 +224,7 @@ export default function Home() {
             <button
               className={`flip-card ${card.symbol ? "is-open" : ""} ${winner && card.symbol === winner ? "winning-card" : ""}`}
               key={card.id}
+              ref={(node) => { cardRefs.current[card.id] = node; }}
               onClick={() => clickCard(card.id)}
               disabled={Boolean(card.symbol) || Boolean(winner) || overlay !== "none"}
               aria-label={card.symbol ? `已翻出${SYMBOLS[card.symbol].name}` : `翻开第${card.id + 1}张卡牌`}
@@ -191,7 +258,28 @@ export default function Home() {
           </aside>
         )}
 
-        {toast && <div className="toast">{toast}</div>}
+        {flyAnimation && (
+          <div
+            className="flying-symbol"
+            key={flyAnimation.id}
+            style={{
+              "--fly-from-x": `${flyAnimation.fromX}px`,
+              "--fly-from-y": `${flyAnimation.fromY}px`,
+              "--fly-to-x": `${flyAnimation.toX}px`,
+              "--fly-to-y": `${flyAnimation.toY}px`,
+            } as CSSProperties}
+          >
+            <SymbolIcon kind={flyAnimation.symbol} />
+          </div>
+        )}
+
+        {toast && (toast === "获得50金币!" ? (
+          <div className="coin-toast" role="status" aria-label={toast}>
+            <img src="/assets/game/coin-toast-50.png" alt="获得50金币" />
+          </div>
+        ) : (
+          <div className="error-toast" role="status">{toast}</div>
+        ))}
 
         {overlay !== "none" && (
           <div className={`overlay overlay-${overlay}`}>
@@ -207,13 +295,6 @@ export default function Home() {
                 <div className="coin-stack" />
                 <h2>看广告翻转卡牌<br />并领取50金币！</h2>
                 <button className="primary-button image-button" onClick={startAd}><img src="/assets/game/button-text-flip.png" alt="翻转卡牌" /></button>
-              </div>
-            )}
-            {overlay === "coinReward" && (
-              <div className="modal reward-modal">
-                <div className="coin-stack" />
-                <h2>获得50金币！</h2>
-                <button className="primary-button" onClick={receiveCoinReward}>领取奖励</button>
               </div>
             )}
             {overlay === "settled" && winner && (
