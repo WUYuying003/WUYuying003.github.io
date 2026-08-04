@@ -235,7 +235,10 @@ export default function Home() {
       window.setTimeout(() => setFlyAnimation(null), 980);
     }
 
-    playSound(symbol === "jade" ? "flip-jade.mp3" : symbol === "ingot" ? "flip-major.mp3" : "flip-small.mp3");
+    playSound(
+      symbol === "jade" ? "flip-jade.mp3" : symbol === "ingot" ? "flip-major.mp3" : "flip-small.mp3",
+      symbol === "jade" ? 1 : 0.86,
+    );
     setSessionCoins((value) => value + 50);
     setCards((current) => current.map((card) => card.id === cardId ? { ...card, symbol } : card));
     setCounts((current) => ({ ...current, [symbol]: nextCount }));
