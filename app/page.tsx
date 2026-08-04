@@ -110,6 +110,7 @@ export default function Home() {
   const cardRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const slotRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const bgmRef = useRef<HTMLAudioElement | null>(null);
+  const flipSoundRef = useRef<HTMLAudioElement | null>(null);
   const rewardSoundRef = useRef<HTMLAudioElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const settlementTimerRef = useRef<number | null>(null);
@@ -125,6 +126,7 @@ export default function Home() {
     bgmRef.current.volume = 0.28;
     return () => {
       bgmRef.current?.pause();
+      flipSoundRef.current?.pause();
       rewardSoundRef.current?.pause();
       if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
       if (settlementTimerRef.current !== null) window.clearTimeout(settlementTimerRef.current);
@@ -137,8 +139,13 @@ export default function Home() {
   }
 
   function playSound(file: string, volume = 0.86) {
+    flipSoundRef.current?.pause();
     const sound = new Audio(`/assets/game/audio/${file}`);
     sound.volume = volume;
+    flipSoundRef.current = sound;
+    sound.addEventListener("ended", () => {
+      if (flipSoundRef.current === sound) flipSoundRef.current = null;
+    }, { once: true });
     void sound.play().catch(() => undefined);
   }
 
@@ -248,10 +255,12 @@ export default function Home() {
       window.setTimeout(() => setFlyAnimation(null), 980);
     }
 
-    playSound(
-      symbol === "jade" ? "flip-jade.mp3" : symbol === "ingot" ? "flip-major.mp3" : "flip-small.mp3",
-      symbol === "jade" ? 1 : 0.86,
-    );
+    if (nextCount < 4) {
+      playSound(
+        symbol === "jade" ? "flip-jade.mp3" : symbol === "ingot" ? "flip-major.mp3" : "flip-small.mp3",
+        symbol === "jade" ? 1 : 0.86,
+      );
+    }
     setSessionCoins((value) => value + 50);
     setCards((current) => current.map((card) => card.id === cardId ? { ...card, symbol } : card));
     setCounts((current) => ({ ...current, [symbol]: nextCount }));
@@ -284,6 +293,8 @@ export default function Home() {
     toastTimerRef.current = null;
     settlementTimerRef.current = null;
     celebrationTimerRef.current = null;
+    flipSoundRef.current?.pause();
+    flipSoundRef.current = null;
     stopRewardSound();
     setCards(blankCards());
     setCounts({ jade: 0, ingot: 0, coin: 0 });

@@ -48,6 +48,8 @@ test("keeps the requested draw rules and jade sound", async () => {
   assert.match(page, /lastSymbol === previousSymbol\s*\? 0/);
   assert.match(page, /DECK_COPIES_PER_SYMBOL - revealedCounts\[symbol\]/);
   assert.match(page, /symbol === "jade" \? "flip-jade\.mp3"/);
+  assert.match(page, /if \(nextCount < 4\)/);
+  assert.match(page, /flipSoundRef\.current\?\.pause\(\)/);
   assert.match(page, /symbol === "ingot" \? "reward-600\.mp3" : "reward-1k\.wav"/);
   await access(new URL("../public/assets/game/audio/flip-jade.mp3", import.meta.url));
 });
