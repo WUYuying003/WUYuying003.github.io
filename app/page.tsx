@@ -28,6 +28,8 @@ const REPEAT_WEIGHT_MULTIPLIER = 0.3;
 const COIN_BASE_WEIGHT_MULTIPLIER = 2.7;
 const JADE_CAP_WEIGHT = 0.0015;
 const INGOT_CAP_WEIGHT = 0.05;
+const BGM_VOLUME = 0.28;
+const DUCKED_BGM_VOLUME = 0.06;
 const WINNER_ROW_DURATION_MS = 3200;
 const CELEBRATION_DURATION_MS = 1000;
 
@@ -123,7 +125,7 @@ export default function Home() {
   useEffect(() => {
     bgmRef.current = new Audio("/assets/game/audio/game-bgm.mp3");
     bgmRef.current.loop = true;
-    bgmRef.current.volume = 0.28;
+    bgmRef.current.volume = BGM_VOLUME;
     return () => {
       bgmRef.current?.pause();
       flipSoundRef.current?.pause();
@@ -138,15 +140,24 @@ export default function Home() {
     if (bgmRef.current?.paused) void bgmRef.current.play().catch(() => undefined);
   }
 
-  function playSound(file: string, volume = 0.86) {
+  function stopFlipSound() {
     flipSoundRef.current?.pause();
+    flipSoundRef.current = null;
+    if (bgmRef.current) bgmRef.current.volume = BGM_VOLUME;
+  }
+
+  function playSound(file: string, volume = 0.86, duckBgm = false) {
+    stopFlipSound();
     const sound = new Audio(`/assets/game/audio/${file}`);
     sound.volume = volume;
     flipSoundRef.current = sound;
-    sound.addEventListener("ended", () => {
+    if (duckBgm && bgmRef.current) bgmRef.current.volume = DUCKED_BGM_VOLUME;
+    const finish = () => {
       if (flipSoundRef.current === sound) flipSoundRef.current = null;
-    }, { once: true });
-    void sound.play().catch(() => undefined);
+      if (duckBgm && bgmRef.current) bgmRef.current.volume = BGM_VOLUME;
+    };
+    sound.addEventListener("ended", finish, { once: true });
+    void sound.play().catch(finish);
   }
 
   function stopRewardSound() {
@@ -255,10 +266,11 @@ export default function Home() {
       window.setTimeout(() => setFlyAnimation(null), 980);
     }
 
-    if (nextCount < 4) {
+    if (nextCount < 4 || symbol === "jade") {
       playSound(
         symbol === "jade" ? "flip-jade.mp3" : symbol === "ingot" ? "flip-major.mp3" : "flip-small.mp3",
         symbol === "jade" ? 1 : 0.86,
+        symbol === "jade",
       );
     }
     setSessionCoins((value) => value + 50);
@@ -270,7 +282,9 @@ export default function Home() {
     if (nextCount >= 4) {
       setWinner(symbol);
       setDebugOpen(false);
-      playRewardSound(symbol === "jade" ? "reward-100k.mp3" : symbol === "ingot" ? "reward-600.mp3" : "reward-1k.wav");
+      if (symbol !== "jade") {
+        playRewardSound(symbol === "ingot" ? "reward-600.mp3" : "reward-1k.wav");
+      }
       settlementTimerRef.current = window.setTimeout(() => {
         settlementTimerRef.current = null;
         if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
@@ -293,8 +307,7 @@ export default function Home() {
     toastTimerRef.current = null;
     settlementTimerRef.current = null;
     celebrationTimerRef.current = null;
-    flipSoundRef.current?.pause();
-    flipSoundRef.current = null;
+    stopFlipSound();
     stopRewardSound();
     setCards(blankCards());
     setCounts({ jade: 0, ingot: 0, coin: 0 });
