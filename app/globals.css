@@ -274,6 +274,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .debug-panel .debug-highlight { background: linear-gradient(#bf6b22, #843816); border-color: #ffd76e; }
 
 .daily-gift-modal p, .guaranteed-modal p { margin: -12px 0 24px; line-height: 1.55; color: #8b552b; }
+.daily-gift-modal .primary-button, .guaranteed-modal .primary-button { display: block; margin-left: auto; margin-right: auto; }
 .gift-number {
   width: 92px; height: 92px; display: grid; place-items: center; margin: -72px auto 4px;
   border-radius: 50%; color: #fff3a4; background: radial-gradient(circle at 40% 30%, #ffe985, #d88618 68%, #8c3e0d 70%);
@@ -281,6 +282,7 @@ button { -webkit-tap-highlight-color: transparent; }
   font: 900 52px serif; text-shadow: 0 3px #9b4b11;
 }
 .guaranteed-modal > .symbol { width: 120px; height: 88px; margin: -56px auto 0; }
+.guaranteed-modal h2 { margin-bottom: 28px; }
 
 .progress-board { padding: 0 22px; margin-top: 0; }
 .progress-row {

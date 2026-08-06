@@ -599,8 +599,7 @@ export default function Home() {
             {overlay === "guaranteedIngot" && (
               <div className="modal guaranteed-modal">
                 <SymbolIcon kind="ingot" />
-                <h2>高价值用户专属好运</h2>
-                <p>下一次翻牌必得金元宝</p>
+                <h2>下一次必得金元宝</h2>
                 <button className="primary-button" onClick={() => setOverlay("none")}>立即翻牌</button>
               </div>
             )}
