@@ -6,6 +6,7 @@ import type { CSSProperties } from "react";
 type SymbolKey = "jade" | "ingot" | "coin";
 type Card = { id: number; symbol: SymbolKey | null };
 type Overlay = "none" | "adPrompt" | "celebration" | "settled" | "rules";
+type AdAction = "flip" | "addChance";
 type FinalCardState = "winner" | "opened" | "unopened";
 type FlyAnimation = {
   id: number;
@@ -22,12 +23,11 @@ const SYMBOLS: Record<SymbolKey, { name: string; reward: string }> = {
   coin: { name: "方孔金币", reward: "600金币" },
 };
 
-const INTRO_SEQUENCE: SymbolKey[] = ["coin", "ingot", "jade"];
 const DECK_COPIES_PER_SYMBOL = 4;
-const REPEAT_WEIGHT_MULTIPLIER = 0.3;
-const COIN_BASE_WEIGHT_MULTIPLIER = 2.7;
-const JADE_CAP_WEIGHT = 0.0015;
-const INGOT_CAP_WEIGHT = 0.05;
+const DAILY_FREE_CHANCES = 3;
+const MAX_CHANCES = 10;
+const DEFAULT_AD_REVENUE = 800;
+const DAILY_STORAGE_KEY = "good-luck-bank-daily-v2";
 const BGM_VOLUME = 0.28;
 const DUCKED_BGM_VOLUME = 0.06;
 const WINNER_ROW_DURATION_MS = 3200;
@@ -42,6 +42,16 @@ function SymbolIcon({ kind, small = false }: { kind: SymbolKey; small?: boolean 
 
 function blankCards(): Card[] {
   return Array.from({ length: 12 }, (_, id) => ({ id, symbol: null }));
+}
+
+function todayKey() {
+  return new Date().toLocaleDateString("sv-SE");
+}
+
+function secureRandom() {
+  const value = new Uint32Array(1);
+  window.crypto.getRandomValues(value);
+  return value[0] / 0x100000000;
 }
 
 function buildFinalCards(cards: Card[], winner: SymbolKey): Array<{ id: number; symbol: SymbolKey; state: FinalCardState }> {
@@ -100,6 +110,12 @@ export default function Home() {
   const [pendingCard, setPendingCard] = useState<number | null>(null);
   const [winner, setWinner] = useState<SymbolKey | null>(null);
   const [sessionCoins, setSessionCoins] = useState(0);
+  const [chances, setChances] = useState(DAILY_FREE_CHANCES);
+  const [dailyAdRevenue, setDailyAdRevenue] = useState(0);
+  const [dailyRewardCost, setDailyRewardCost] = useState(0);
+  const [adAction, setAdAction] = useState<AdAction>("flip");
+  const [adRevenueNext, setAdRevenueNext] = useState(DEFAULT_AD_REVENUE);
+  const [dailyReady, setDailyReady] = useState(false);
   const [adRequests, setAdRequests] = useState(0);
   const [adSuccess, setAdSuccess] = useState(0);
   const [failNext, setFailNext] = useState(false);
@@ -121,6 +137,7 @@ export default function Home() {
   const drawHistoryRef = useRef<SymbolKey[]>([]);
 
   const flips = useMemo(() => cards.filter((card) => card.symbol).length, [cards]);
+  const dailySurplus = dailyAdRevenue - dailyRewardCost;
 
   useEffect(() => {
     bgmRef.current = new Audio("/assets/game/audio/game-bgm.mp3");
@@ -135,6 +152,37 @@ export default function Home() {
       if (celebrationTimerRef.current !== null) window.clearTimeout(celebrationTimerRef.current);
     };
   }, []);
+
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(DAILY_STORAGE_KEY) || "null") as null | {
+        date: string; chances: number; adRevenue: number; rewardCost: number;
+      };
+      const date = todayKey();
+      if (!saved) {
+        setChances(DAILY_FREE_CHANCES);
+      } else if (saved.date === date) {
+        setChances(Math.min(MAX_CHANCES, Math.max(0, saved.chances)));
+        setDailyAdRevenue(Math.max(0, saved.adRevenue || 0));
+        setDailyRewardCost(Math.max(0, saved.rewardCost || 0));
+      } else {
+        setChances(saved.chances >= 8 ? MAX_CHANCES : Math.min(MAX_CHANCES, saved.chances + DAILY_FREE_CHANCES));
+        setDailyAdRevenue(0);
+        setDailyRewardCost(0);
+      }
+    } catch {
+      setChances(DAILY_FREE_CHANCES);
+    }
+    setDailyReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!dailyReady) return;
+    localStorage.setItem(DAILY_STORAGE_KEY, JSON.stringify({
+      date: todayKey(), chances, adRevenue: dailyAdRevenue, rewardCost: dailyRewardCost,
+    }));
+  }, [chances, dailyAdRevenue, dailyRewardCost, dailyReady]);
 
   function unlockBgm() {
     if (bgmRef.current?.paused) void bgmRef.current.play().catch(() => undefined);
@@ -183,35 +231,32 @@ export default function Home() {
     toastTimerRef.current = window.setTimeout(() => setToast(""), 5000);
   }
 
-  function chooseSymbol(flipIndex: number): SymbolKey {
+  function chooseSymbol(): SymbolKey {
     if (nextSymbol !== "random") {
       const chosen = nextSymbol;
       setNextSymbol("random");
       return chosen;
     }
-    if (flipIndex < INTRO_SEQUENCE.length) return INTRO_SEQUENCE[flipIndex];
-
     const remaining = {
       jade: DECK_COPIES_PER_SYMBOL - counts.jade,
       ingot: DECK_COPIES_PER_SYMBOL - counts.ingot,
       coin: DECK_COPIES_PER_SYMBOL - counts.coin,
     };
-    const weights: Record<SymbolKey, number> = {
-      jade: remaining.jade <= 0 ? 0 : counts.jade >= 3 ? JADE_CAP_WEIGHT : 3 * remaining.jade,
-      ingot: remaining.ingot <= 0 ? 0 : counts.ingot >= 3 ? INGOT_CAP_WEIGHT : 0.8 * remaining.ingot,
-      coin: COIN_BASE_WEIGHT_MULTIPLIER * Math.max(0, remaining.coin),
-    };
-    const lastSymbol = drawHistoryRef.current.at(-1);
-    const previousSymbol = drawHistoryRef.current.at(-2);
-    if (lastSymbol) {
-      weights[lastSymbol] = lastSymbol === previousSymbol
-        ? 0
-        : weights[lastSymbol] * REPEAT_WEIGHT_MULTIPLIER;
+    const symbols: SymbolKey[] = ["jade", "ingot", "coin"];
+    const target: SymbolKey = dailySurplus < 5000 ? "coin" : dailySurplus < 500000 ? "ingot" : "jade";
+    const capped = symbols.filter((symbol) => counts[symbol] >= 3 && remaining[symbol] > 0);
+    if (capped.length) {
+      if (capped.includes(target)) return target;
+      const alternatives = symbols.filter((symbol) => remaining[symbol] > 0 && !capped.includes(symbol));
+      return alternatives[Math.floor(secureRandom() * alternatives.length)] || target;
     }
+    const weights: Record<SymbolKey, number> = {
+      jade: remaining.jade > 0 ? 1 : 0,
+      ingot: remaining.ingot > 0 ? 1 : 0,
+      coin: remaining.coin > 0 ? 1 : 0,
+    };
     const totalWeight = weights.jade + weights.ingot + weights.coin;
-    const randomValue = new Uint32Array(1);
-    window.crypto.getRandomValues(randomValue);
-    const value = (randomValue[0] / 0x100000000) * totalWeight;
+    const value = secureRandom() * totalWeight;
     if (value < weights.jade) return "jade";
     if (value < weights.jade + weights.ingot) return "ingot";
     return "coin";
@@ -220,11 +265,21 @@ export default function Home() {
   function clickCard(id: number) {
     if (overlay !== "none" || winner || cards[id].symbol) return;
     unlockBgm();
-    if (flips < 5) {
+    if (chances >= 1) {
+      setChances((value) => Math.max(0, value - 1));
       revealCard(id);
       return;
     }
     setPendingCard(id);
+    setAdAction("flip");
+    setOverlay("adPrompt");
+  }
+
+  function requestAddChance() {
+    if (chances >= MAX_CHANCES || overlay !== "none" || winner) return;
+    unlockBgm();
+    setPendingCard(null);
+    setAdAction("addChance");
     setOverlay("adPrompt");
   }
 
@@ -242,11 +297,18 @@ export default function Home() {
 
   function finishAd() {
     setAdSuccess((value) => value + 1);
-    if (pendingCard !== null) revealCard(pendingCard);
+    setDailyAdRevenue((value) => value + adRevenueNext);
+    if (adAction === "flip" && pendingCard !== null) {
+      revealCard(pendingCard);
+    } else {
+      setChances((value) => Math.min(MAX_CHANCES, value + 1));
+      setOverlay("none");
+      showToast("广告完成，翻牌次数+1");
+    }
   }
 
   function revealCard(cardId: number) {
-    const symbol = chooseSymbol(flips);
+    const symbol = chooseSymbol();
     drawHistoryRef.current.push(symbol);
     const nextCount = counts[symbol] + 1;
     const shellRect = shellRef.current?.getBoundingClientRect();
@@ -281,9 +343,10 @@ export default function Home() {
     showToast("获得50金币!");
     if (nextCount >= 4) {
       setWinner(symbol);
+      setDailyRewardCost((value) => value + (symbol === "jade" ? 100000 : symbol === "ingot" ? 1000 : 600));
       setDebugOpen(false);
       if (symbol !== "jade") {
-        playRewardSound(symbol === "ingot" ? "reward-600.mp3" : "reward-1k.wav");
+        playRewardSound(symbol === "ingot" ? "reward-1k.wav" : "reward-600.mp3");
       }
       settlementTimerRef.current = window.setTimeout(() => {
         settlementTimerRef.current = null;
@@ -314,6 +377,7 @@ export default function Home() {
     setOverlay("none");
     setPendingCard(null);
     setWinner(null);
+    setSessionCoins(0);
     setAdRequests(0);
     setAdSuccess(0);
     setToast("");
@@ -337,6 +401,10 @@ export default function Home() {
           <div className="title-plaque">好运钱庄</div>
           <p>✦ 集齐4个同款，赢取奖励 ✦</p>
           <button className="round-tool debug-tool" onClick={() => setDebugOpen((value) => !value)} disabled={Boolean(winner)} aria-label="打开测试面板">⚙</button>
+          <div className="chance-panel" aria-label={`剩余翻牌次数${chances}次`}>
+            <span>今日可翻 <strong>{chances}</strong><small>/10次</small></span>
+            <button onClick={requestAddChance} disabled={chances >= MAX_CHANCES || Boolean(winner)}>看广告 +1次</button>
+          </div>
         </header>
 
         <section className="progress-board" aria-label="奖励进度">
@@ -390,13 +458,14 @@ export default function Home() {
                 <option value="coin">方孔金币</option>
               </select>
             </label>
+            <label>单条广告收益<input type="number" min="0" value={adRevenueNext} onChange={(event) => setAdRevenueNext(Math.max(0, Number(event.target.value) || 0))} /></label>
             <button className={failNext ? "debug-danger active" : "debug-danger"} onClick={() => setFailNext(true)}>下一次广告失败</button>
             <button onClick={resetGame}>重置本局</button>
             <div className="debug-stats">
               <span>翻牌 {flips}</span><span>广告 {adSuccess}/{adRequests}</span>
-              <span>免广告 {Math.max(0, 5 - flips)}</span><span>下次 {flips < 5 ? "免费" : "广告"}</span>
+              <span>次数 {chances}/10</span><span>下次 {chances > 0 ? "扣次数" : "需广告"}</span>
               <span>玉 {counts.jade}</span><span>元宝 {counts.ingot}</span><span>铜钱 {counts.coin}</span>
-              <span>金币 {sessionCoins}</span>
+              <span>本局金币 {sessionCoins}</span><span>今日盈余 {dailySurplus}</span>
             </div>
           </aside>
         )}
@@ -436,8 +505,8 @@ export default function Home() {
                   <img src="/assets/game/close.png" alt="" />
                 </button>
                 <div className="coin-stack" />
-                <h2>看广告翻转卡牌<br />并领取50金币！</h2>
-                <button className="primary-button image-button" onClick={startAd}><img src="/assets/game/button-text-flip.png" alt="翻转卡牌" /></button>
+                <h2>{adAction === "flip" ? <>看广告翻转卡牌<br />并领取50金币！</> : <>完整观看广告<br />翻牌次数+1</>}</h2>
+                <button className="primary-button image-button" onClick={startAd}>{adAction === "flip" ? <img src="/assets/game/button-text-flip.png" alt="翻转卡牌" /> : "看广告 +1次"}</button>
               </div>
             )}
             {overlay === "settled" && winner && (
@@ -470,8 +539,8 @@ export default function Home() {
               <div className="modal rules-modal">
                 <h2>活动规则</h2>
                 <ol>
-                  <li>前5次可直接免费翻牌，第6次起完整观看广告后即可翻牌。</li>
-                  <li>前3次必定集齐三种不同图案，第4次起进入随机抽取。</li>
+                  <li>每天首次进入获得3次机会，最多可累计10次；每次翻牌消耗1次。</li>
+                  <li>次数为0时，可先看广告增加次数，也可点击卡牌看广告后直接翻牌。</li>
                   <li>每次有效翻牌必得50金币。</li>
                   <li>同一种图案累计4个即可获得对应大奖，无需连续出现。</li>
                   <li>广告失败或中断时，不消耗卡牌，也不会发放奖励。</li>

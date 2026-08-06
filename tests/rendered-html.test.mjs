@@ -37,15 +37,16 @@ test("server-renders the game shell", async () => {
   assert.equal((html.match(/class="flip-card/g) ?? []).length, 12);
 });
 
-test("keeps the requested draw rules and jade sound", async () => {
+test("keeps the PRD chance, random draw, surplus, and sound rules", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 
-  assert.match(page, /INTRO_SEQUENCE: SymbolKey\[\] = \["coin", "ingot", "jade"\]/);
-  assert.match(page, /JADE_CAP_WEIGHT = 0\.0015/);
-  assert.match(page, /INGOT_CAP_WEIGHT = 0\.05/);
-  assert.match(page, /COIN_BASE_WEIGHT_MULTIPLIER = 2\.7/);
-  assert.match(page, /REPEAT_WEIGHT_MULTIPLIER = 0\.3/);
-  assert.match(page, /lastSymbol === previousSymbol\s*\? 0/);
+  assert.match(page, /DAILY_FREE_CHANCES = 3/);
+  assert.match(page, /MAX_CHANCES = 10/);
+  assert.match(page, /saved\.chances >= 8 \? MAX_CHANCES/);
+  assert.match(page, /jade: remaining\.jade > 0 \? 1 : 0/);
+  assert.match(page, /dailySurplus < 5000 \? "coin" : dailySurplus < 500000 \? "ingot" : "jade"/);
+  assert.match(page, /setChances\(\(value\) => Math\.min\(MAX_CHANCES, value \+ 1\)\)/);
+  assert.match(page, /setChances\(\(value\) => Math\.max\(0, value - 1\)\)/);
   assert.match(page, /DECK_COPIES_PER_SYMBOL - revealedCounts\[symbol\]/);
   assert.match(page, /symbol === "jade" \? "flip-jade\.mp3"/);
   assert.match(page, /nextCount < 4 \|\| symbol === "jade"/);
@@ -53,6 +54,6 @@ test("keeps the requested draw rules and jade sound", async () => {
   assert.match(page, /if \(symbol !== "jade"\)/);
   assert.match(page, /DUCKED_BGM_VOLUME = 0\.06/);
   assert.match(page, /flipSoundRef\.current\?\.pause\(\)/);
-  assert.match(page, /symbol === "ingot" \? "reward-600\.mp3" : "reward-1k\.wav"/);
+  assert.match(page, /symbol === "ingot" \? "reward-1k\.wav" : "reward-600\.mp3"/);
   await access(new URL("../public/assets/game/audio/flip-jade.mp3", import.meta.url));
 });
