@@ -5,7 +5,7 @@ import type { CSSProperties } from "react";
 
 type SymbolKey = "jade" | "ingot" | "coin";
 type Card = { id: number; symbol: SymbolKey | null };
-type Overlay = "none" | "adPrompt" | "celebration" | "settled" | "rules";
+type Overlay = "none" | "adPrompt" | "celebration" | "settled" | "rules" | "dailyGift" | "guaranteedIngot";
 type AdAction = "flip" | "addChance";
 type FinalCardState = "winner" | "opened" | "unopened";
 type FlyAnimation = {
@@ -28,6 +28,7 @@ const DAILY_FREE_CHANCES = 3;
 const MAX_CHANCES = 10;
 const DEFAULT_AD_REVENUE = 800;
 const DAILY_STORAGE_KEY = "good-luck-bank-daily-v2";
+const DAILY_CLAIM_STORAGE_KEY = "good-luck-bank-claimed-date-v1";
 const BGM_VOLUME = 0.28;
 const DUCKED_BGM_VOLUME = 0.06;
 const WINNER_ROW_DURATION_MS = 3200;
@@ -171,8 +172,10 @@ export default function Home() {
         setDailyAdRevenue(0);
         setDailyRewardCost(0);
       }
+      if (localStorage.getItem(DAILY_CLAIM_STORAGE_KEY) !== date) setOverlay("dailyGift");
     } catch {
       setChances(DAILY_FREE_CHANCES);
+      setOverlay("dailyGift");
     }
     setDailyReady(true);
   }, []);
@@ -280,7 +283,27 @@ export default function Home() {
     unlockBgm();
     setPendingCard(null);
     setAdAction("addChance");
-    setOverlay("adPrompt");
+    setAdRequests((value) => value + 1);
+    if (failNext) {
+      setFailNext(false);
+      showToast("广告播放失败，次数未增加，请重试");
+      return;
+    }
+    setAdSuccess((value) => value + 1);
+    setDailyAdRevenue((value) => value + adRevenueNext);
+    setChances((value) => Math.min(MAX_CHANCES, value + 1));
+    showToast("广告完成，翻牌次数+1");
+  }
+
+  function claimDailyGift() {
+    localStorage.setItem(DAILY_CLAIM_STORAGE_KEY, todayKey());
+    setOverlay("none");
+  }
+
+  function enableHighValueDemo() {
+    setNextSymbol("ingot");
+    setDebugOpen(false);
+    setOverlay("guaranteedIngot");
   }
 
   function startAd() {
@@ -401,8 +424,8 @@ export default function Home() {
           <div className="title-plaque">好运钱庄</div>
           <p>✦ 集齐4个同款，赢取奖励 ✦</p>
           <button className="round-tool debug-tool" onClick={() => setDebugOpen((value) => !value)} disabled={Boolean(winner)} aria-label="打开测试面板">⚙</button>
-          <div className="chance-panel" aria-label={`剩余翻牌次数${chances}次`}>
-            <span>今日可翻 <strong>{chances}</strong><small>/10次</small></span>
+          <div className="chance-panel" aria-label={`剩余可翻次数${chances}次`}>
+            <span>剩余可翻次数 <strong>{chances}</strong><small>/10</small></span>
             <button onClick={requestAddChance} disabled={chances >= MAX_CHANCES || Boolean(winner)}>看广告 +1次</button>
           </div>
         </header>
@@ -459,6 +482,7 @@ export default function Home() {
               </select>
             </label>
             <label>单条广告收益<input type="number" min="0" value={adRevenueNext} onChange={(event) => setAdRevenueNext(Math.max(0, Number(event.target.value) || 0))} /></label>
+            <button className="debug-highlight" onClick={enableHighValueDemo}>模拟高价值用户</button>
             <button className={failNext ? "debug-danger active" : "debug-danger"} onClick={() => setFailNext(true)}>下一次广告失败</button>
             <button onClick={resetGame}>重置本局</button>
             <div className="debug-stats">
@@ -546,6 +570,22 @@ export default function Home() {
                   <li>广告失败或中断时，不消耗卡牌，也不会发放奖励。</li>
                 </ol>
                 <button className="primary-button" onClick={() => setOverlay("none")}>我知道了</button>
+              </div>
+            )}
+            {overlay === "dailyGift" && (
+              <div className="modal daily-gift-modal">
+                <div className="gift-number">3</div>
+                <h2>今日免费翻牌次数<br />已到账</h2>
+                <p>每日登录可领取3次，观看广告最多可累计至10次</p>
+                <button className="primary-button" onClick={claimDailyGift}>领取3次</button>
+              </div>
+            )}
+            {overlay === "guaranteedIngot" && (
+              <div className="modal guaranteed-modal">
+                <SymbolIcon kind="ingot" />
+                <h2>高价值用户专属好运</h2>
+                <p>下一次翻牌必得金元宝</p>
+                <button className="primary-button" onClick={() => setOverlay("none")}>立即翻牌</button>
               </div>
             )}
           </div>
