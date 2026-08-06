@@ -42,7 +42,9 @@ test("keeps the PRD chance, random draw, surplus, and sound rules", async () => 
 
   assert.match(page, /DAILY_FREE_CHANCES = 3/);
   assert.match(page, /MAX_CHANCES = 10/);
-  assert.match(page, /saved\.chances >= 8 \? MAX_CHANCES/);
+  assert.match(page, /value >= 8 \? MAX_CHANCES/);
+  assert.match(page, /localStorage\.removeItem\(DAILY_STORAGE_KEY\)/);
+  assert.match(page, /localStorage\.removeItem\(DAILY_CLAIM_STORAGE_KEY\)/);
   assert.match(page, /jade: remaining\.jade > 0 \? 1 : 0/);
   assert.match(page, /dailySurplus < 5000 \? "coin" : dailySurplus < 500000 \? "ingot" : "jade"/);
   assert.match(page, /setChances\(\(value\) => Math\.min\(MAX_CHANCES, value \+ 1\)\)/);

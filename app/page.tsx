@@ -111,7 +111,7 @@ export default function Home() {
   const [pendingCard, setPendingCard] = useState<number | null>(null);
   const [winner, setWinner] = useState<SymbolKey | null>(null);
   const [sessionCoins, setSessionCoins] = useState(0);
-  const [chances, setChances] = useState(DAILY_FREE_CHANCES);
+  const [chances, setChances] = useState(0);
   const [dailyAdRevenue, setDailyAdRevenue] = useState(0);
   const [dailyRewardCost, setDailyRewardCost] = useState(0);
   const [adAction, setAdAction] = useState<AdAction>("flip");
@@ -162,19 +162,19 @@ export default function Home() {
       };
       const date = todayKey();
       if (!saved) {
-        setChances(DAILY_FREE_CHANCES);
+        setChances(0);
       } else if (saved.date === date) {
         setChances(Math.min(MAX_CHANCES, Math.max(0, saved.chances)));
         setDailyAdRevenue(Math.max(0, saved.adRevenue || 0));
         setDailyRewardCost(Math.max(0, saved.rewardCost || 0));
       } else {
-        setChances(saved.chances >= 8 ? MAX_CHANCES : Math.min(MAX_CHANCES, saved.chances + DAILY_FREE_CHANCES));
+        setChances(Math.min(MAX_CHANCES, Math.max(0, saved.chances)));
         setDailyAdRevenue(0);
         setDailyRewardCost(0);
       }
       if (localStorage.getItem(DAILY_CLAIM_STORAGE_KEY) !== date) setOverlay("dailyGift");
     } catch {
-      setChances(DAILY_FREE_CHANCES);
+      setChances(0);
       setOverlay("dailyGift");
     }
     setDailyReady(true);
@@ -296,6 +296,7 @@ export default function Home() {
   }
 
   function claimDailyGift() {
+    setChances((value) => value >= 8 ? MAX_CHANCES : Math.min(MAX_CHANCES, value + DAILY_FREE_CHANCES));
     localStorage.setItem(DAILY_CLAIM_STORAGE_KEY, todayKey());
     setOverlay("none");
   }
@@ -408,6 +409,20 @@ export default function Home() {
     drawHistoryRef.current = [];
   }
 
+  function resetAllData() {
+    resetGame();
+    setChances(0);
+    setDailyAdRevenue(0);
+    setDailyRewardCost(0);
+    setAdRevenueNext(DEFAULT_AD_REVENUE);
+    setNextSymbol("random");
+    setFailNext(false);
+    setDebugOpen(false);
+    localStorage.removeItem(DAILY_STORAGE_KEY);
+    localStorage.removeItem(DAILY_CLAIM_STORAGE_KEY);
+    setOverlay("dailyGift");
+  }
+
   const rows: SymbolKey[] = ["jade", "ingot", "coin"];
 
   return (
@@ -484,12 +499,13 @@ export default function Home() {
             <label>单条广告收益<input type="number" min="0" value={adRevenueNext} onChange={(event) => setAdRevenueNext(Math.max(0, Number(event.target.value) || 0))} /></label>
             <button className="debug-highlight" onClick={enableHighValueDemo}>模拟高价值用户</button>
             <button className={failNext ? "debug-danger active" : "debug-danger"} onClick={() => setFailNext(true)}>下一次广告失败</button>
-            <button onClick={resetGame}>重置本局</button>
+            <button onClick={resetAllData}>重置所有数据</button>
             <div className="debug-stats">
               <span>翻牌 {flips}</span><span>广告 {adSuccess}/{adRequests}</span>
               <span>次数 {chances}/10</span><span>下次 {chances > 0 ? "扣次数" : "需广告"}</span>
               <span>玉 {counts.jade}</span><span>元宝 {counts.ingot}</span><span>铜钱 {counts.coin}</span>
-              <span>本局金币 {sessionCoins}</span><span>今日盈余 {dailySurplus}</span>
+              <span>本局金币 {sessionCoins}</span><span>广告收益 {dailyAdRevenue}</span>
+              <span>奖励支出 {dailyRewardCost}</span><span>今日盈余 {dailySurplus}</span>
             </div>
           </aside>
         )}
