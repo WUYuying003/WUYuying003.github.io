@@ -104,7 +104,7 @@ function FinalCardGrid({ cards, winner, dimmed = false }: { cards: Card[]; winne
   );
 }
 
-export default function Home() {
+export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
   const [cards, setCards] = useState<Card[]>(blankCards);
   const [counts, setCounts] = useState<Record<SymbolKey, number>>({ jade: 0, ingot: 0, coin: 0 });
   const [overlay, setOverlay] = useState<Overlay>("none");
@@ -162,23 +162,29 @@ export default function Home() {
       };
       const date = todayKey();
       if (!saved) {
-        setChances(0);
+        setChances(hideEnergy ? DAILY_FREE_CHANCES : 0);
       } else if (saved.date === date) {
         setChances(Math.min(MAX_CHANCES, Math.max(0, saved.chances)));
         setDailyAdRevenue(Math.max(0, saved.adRevenue || 0));
         setDailyRewardCost(Math.max(0, saved.rewardCost || 0));
       } else {
-        setChances(Math.min(MAX_CHANCES, Math.max(0, saved.chances)));
+        const carried = Math.min(MAX_CHANCES, Math.max(0, saved.chances));
+        setChances(hideEnergy ? (carried >= 8 ? MAX_CHANCES : Math.min(MAX_CHANCES, carried + DAILY_FREE_CHANCES)) : carried);
         setDailyAdRevenue(0);
         setDailyRewardCost(0);
       }
-      if (localStorage.getItem(DAILY_CLAIM_STORAGE_KEY) !== date) setOverlay("dailyGift");
+      if (hideEnergy) {
+        localStorage.setItem(DAILY_CLAIM_STORAGE_KEY, date);
+      } else if (localStorage.getItem(DAILY_CLAIM_STORAGE_KEY) !== date) {
+        setOverlay("dailyGift");
+      }
     } catch {
-      setChances(0);
-      setOverlay("dailyGift");
+      setChances(hideEnergy ? DAILY_FREE_CHANCES : 0);
+      if (hideEnergy) localStorage.setItem(DAILY_CLAIM_STORAGE_KEY, todayKey());
+      else setOverlay("dailyGift");
     }
     setDailyReady(true);
-  }, []);
+  }, [hideEnergy]);
 
   useEffect(() => {
     if (!dailyReady) return;
@@ -439,10 +445,12 @@ export default function Home() {
           <div className="title-plaque">好运钱庄</div>
           <p>✦ 集齐4个同款，赢取奖励 ✦</p>
           <button className="round-tool debug-tool" onClick={() => setDebugOpen((value) => !value)} disabled={Boolean(winner)} aria-label="打开测试面板">⚙</button>
-          <div className="chance-panel" aria-label={`剩余可翻次数${chances}次`}>
-            <span>剩余可翻次数 <strong>{chances}</strong><small>/10</small></span>
-            <button onClick={requestAddChance} disabled={chances >= MAX_CHANCES || Boolean(winner)}>看广告 +1次</button>
-          </div>
+          {!hideEnergy && (
+            <div className="chance-panel" aria-label={`剩余可翻次数${chances}次`}>
+              <span>剩余可翻次数 <strong>{chances}</strong><small>/10</small></span>
+              <button onClick={requestAddChance} disabled={chances >= MAX_CHANCES || Boolean(winner)}>看广告 +1次</button>
+            </div>
+          )}
         </header>
 
         <section className="progress-board" aria-label="奖励进度">
@@ -579,8 +587,17 @@ export default function Home() {
               <div className="modal rules-modal">
                 <h2>活动规则</h2>
                 <ol>
-                  <li>每天首次进入获得3次机会，最多可累计10次；每次翻牌消耗1次。</li>
-                  <li>次数为0时，可先看广告增加次数，也可点击卡牌看广告后直接翻牌。</li>
+                  {hideEnergy ? (
+                    <>
+                      <li>每天自动获得3次翻牌机会，每次翻牌消耗1次。</li>
+                      <li>次数为0时，点击卡牌完整观看广告后即可继续翻牌。</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>每天首次进入获得3次机会，最多可累计10次；每次翻牌消耗1次。</li>
+                      <li>次数为0时，可先看广告增加次数，也可点击卡牌看广告后直接翻牌。</li>
+                    </>
+                  )}
                   <li>每次有效翻牌必得50金币。</li>
                   <li>同一种图案累计4个即可获得对应大奖，无需连续出现。</li>
                   <li>广告失败或中断时，不消耗卡牌，也不会发放奖励。</li>

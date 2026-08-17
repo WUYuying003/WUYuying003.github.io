@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
-async function render() {
+async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
 
   return worker.fetch(
-    new Request("http://localhost/", {
+    new Request(`http://localhost${path}`, {
       headers: { accept: "text/html" },
     }),
     {
@@ -34,6 +34,15 @@ test("server-renders the game shell", async () => {
   assert.match(html, />100KB</);
   assert.match(html, />1KB</);
   assert.match(html, />600金币</);
+  assert.equal((html.match(/class="flip-card/g) ?? []).length, 12);
+});
+
+test("server-renders the no-energy demo without chance UI", async () => {
+  const response = await render("/no-energy/");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /aria-label="好运钱庄翻牌游戏"/);
+  assert.doesNotMatch(html, /class="chance-panel"/);
   assert.equal((html.match(/class="flip-card/g) ?? []).length, 12);
 });
 
