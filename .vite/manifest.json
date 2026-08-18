@@ -11,7 +11,7 @@
     "name": "rolldown-runtime"
   },
   "app/no-energy/page.tsx": {
-    "file": "assets/page-BtQcDzif.js",
+    "file": "assets/page-Cl14C22g.js",
     "name": "page",
     "src": "app/no-energy/page.tsx",
     "isDynamicEntry": true,
@@ -21,7 +21,7 @@
     ]
   },
   "app/page.tsx": {
-    "file": "assets/page-CiykQAIo.js",
+    "file": "assets/page-M0q8V9fk.js",
     "name": "page",
     "src": "app/page.tsx",
     "isDynamicEntry": true,
@@ -31,7 +31,7 @@
     ]
   },
   "node_modules/vinext/dist/shims/layout-segment-context.js": {
-    "file": "assets/layout-segment-context-Cl5Sx-4e.js",
+    "file": "assets/layout-segment-context-CVyDDPsc.js",
     "name": "layout-segment-context",
     "src": "node_modules/vinext/dist/shims/layout-segment-context.js",
     "isDynamicEntry": true,
@@ -42,7 +42,7 @@
     ]
   },
   "virtual:vinext-app-browser-entry": {
-    "file": "assets/index-CsJXG0kb.js",
+    "file": "assets/index-DUAE09w8.js",
     "name": "index",
     "src": "virtual:vinext-app-browser-entry",
     "isEntry": true,
