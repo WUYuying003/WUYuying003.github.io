@@ -665,7 +665,8 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
               </div>
             )}
             {overlay === "dailyGift" && (
-              <div className="modal daily-gift-modal">
+              <div className="modal ornate-modal daily-gift-modal">
+                <button className="ornate-modal-close" onClick={() => setOverlay("none")} aria-label="关闭"><img src="/assets/game/close.png" alt="" /></button>
                 <div className="gift-number">3</div>
                 <h2>今日免费翻牌次数<br />已到账</h2>
                 <p>每日登录可领取3次，观看广告最多可累计至10次</p>
@@ -680,7 +681,12 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
               </div>
             )}
             {overlay === "jackpotBoard" && (
-              <div className="modal jackpot-board-modal">
+              <div className="modal ornate-modal jackpot-board-modal">
+                <button className="ornate-modal-close" onClick={() => setOverlay("none")} aria-label="关闭"><img src="/assets/game/close.png" alt="" /></button>
+                <div className="jackpot-modal-hero" aria-hidden="true">
+                  <img className="jackpot-hero-coin" src="/assets/game/coin-large.png" alt="" />
+                  <img className="jackpot-hero-gift" src="/assets/game/gift-cube.png" alt="" />
+                </div>
                 <h2>100K币大奖榜</h2>
                 <p>大奖已成功发放</p>
                 <ol>
