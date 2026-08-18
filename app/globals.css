@@ -255,6 +255,17 @@ button { -webkit-tap-highlight-color: transparent; }
 .phone-shell::before, .ambient, .roof, .portrait, .title-plaque, .bank-header p { display: none; }
 .bank-header { height: 23.8%; min-height: 0; padding: 0; background: transparent; }
 .round-tool { top: 18px; background: #733516cc; }
+.jackpot-ticker {
+  position: absolute; z-index: 18; top: 15px; left: 13%; width: 74%; min-height: 36px;
+  display: flex; align-items: center; gap: 7px; overflow: hidden; padding: 5px 10px;
+  border: 2px solid #d99a39; border-radius: 18px; color: #6f310d;
+  background: linear-gradient(180deg, rgba(255,246,205,.96), rgba(239,188,101,.96));
+  box-shadow: inset 0 0 0 1px #fff0b7, 0 3px 7px rgba(75,31,6,.3);
+  font-size: 11px; white-space: nowrap; cursor: pointer;
+}
+.jackpot-ticker b { flex: 0 0 auto; padding-right: 7px; color: #9d2f17; border-right: 1px solid rgba(128,66,18,.35); }
+.jackpot-ticker span { overflow: hidden; text-overflow: ellipsis; }
+.jackpot-ticker:disabled { opacity: .65; }
 
 .chance-panel {
   position: absolute; z-index: 12; left: 50%; bottom: 8px; transform: translateX(-50%);
@@ -358,6 +369,20 @@ button { -webkit-tap-highlight-color: transparent; }
 .card-back { background-image: url("/assets/game/card-back.png"); }
 .card-back::before, .card-back i { display: none; }
 .card-front { background-image: url("/assets/game/card-front.png"); }
+.flip-card.is-reward-card .card-back {
+  filter: saturate(1.18) brightness(1.03) drop-shadow(0 0 7px rgba(255,215,72,.9));
+  animation: rewardCardPulse .85s ease-in-out infinite alternate;
+}
+.reward-card-label, .reward-card-result {
+  position: relative; z-index: 2; display: grid; place-items: center; color: #7b360d; line-height: 1;
+  text-shadow: 0 1px #fff1ae;
+}
+.reward-card-label b { padding: 3px 7px; border-radius: 10px; color: #ffe69a; background: #216044; font-size: clamp(9px, 2.5vw, 12px); }
+.reward-card-label strong { margin-top: 4px; color: #b34216; font-size: clamp(22px, 6vw, 30px); }
+.reward-card-label small { margin-top: 2px; font-weight: 900; }
+.reward-card-result img { width: 45px; height: 45px; object-fit: contain; }
+.reward-card-result strong { color: #b34216; font-size: clamp(20px, 5.5vw, 28px); }
+.reward-card-result small { font-weight: 900; }
 .symbol {
   width: 78%;
   height: 78%;
@@ -426,6 +451,18 @@ button { -webkit-tap-highlight-color: transparent; }
   line-height: 0;
 }
 .reward-modal .image-button img { display: block; width: 57%; height: auto; margin: 0; object-fit: contain; object-position: center; }
+
+.jackpot-board-modal { position: relative; padding-top: 25px; }
+.jackpot-board-modal h2 { margin: 0 0 4px; color: #8f2f16; }
+.jackpot-board-modal > p { margin: 0 0 16px; color: #a06a35; }
+.jackpot-board-modal ol { list-style: none; margin: 0 0 20px; padding: 0; }
+.jackpot-board-modal li {
+  display: grid; grid-template-columns: 1fr 1fr auto; align-items: center; gap: 7px;
+  padding: 10px 5px; border-bottom: 1px solid rgba(145,83,28,.22); text-align: left;
+}
+.jackpot-board-modal li time { color: #996239; font-size: 13px; }
+.jackpot-board-modal li strong { color: #b63d19; }
+.jackpot-board-modal .primary-button { display: grid; margin: 0 auto; }
 
 .overlay-settled, .overlay-celebration { padding: 0; background: rgba(12, 8, 4, .82); }
 .settlement, .celebration-screen {
@@ -557,6 +594,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .open-chest::after { display: none; }
 .open-chest > img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 14px 10px #100804); animation: chestIn .7s cubic-bezier(.2,.8,.2,1.2); }
 
+@keyframes rewardCardPulse { to { filter: saturate(1.32) brightness(1.12) drop-shadow(0 0 13px rgba(255,225,80,1)); transform: translateY(-2px); } }
 @keyframes chestIn {
   from { opacity: 0; transform: translateY(40px) scale(.65); }
   to { opacity: 1; transform: translateY(0) scale(1); }

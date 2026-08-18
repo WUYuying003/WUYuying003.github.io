@@ -54,8 +54,12 @@ test("keeps the PRD chance, random draw, surplus, and sound rules", async () => 
   assert.match(page, /value >= 8 \? MAX_CHANCES/);
   assert.match(page, /localStorage\.removeItem\(DAILY_STORAGE_KEY\)/);
   assert.match(page, /localStorage\.removeItem\(DAILY_CLAIM_STORAGE_KEY\)/);
+  assert.match(page, /REWARD_CARD_COINS = 200/);
+  assert.match(page, /effectiveSurplus - 50 - REWARD_VALUES\[symbol\] > REWARD_CARD_COINS/);
+  assert.match(page, /adAction === "reward"/);
+  assert.match(page, /100K币大奖榜/);
   assert.match(page, /jade: remaining\.jade > 0 \? 1 : 0/);
-  assert.match(page, /dailySurplus < 5000 \? "coin" : dailySurplus < 500000 \? "ingot" : "jade"/);
+  assert.match(page, /effectiveSurplus < 5000 \? "coin" : effectiveSurplus < 500000 \? "ingot" : "jade"/);
   assert.match(page, /setChances\(\(value\) => Math\.min\(MAX_CHANCES, value \+ 1\)\)/);
   assert.match(page, /setChances\(\(value\) => Math\.max\(0, value - 1\)\)/);
   assert.match(page, /DECK_COPIES_PER_SYMBOL - revealedCounts\[symbol\]/);

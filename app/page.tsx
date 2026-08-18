@@ -4,9 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 
 type SymbolKey = "jade" | "ingot" | "coin";
-type Card = { id: number; symbol: SymbolKey | null };
-type Overlay = "none" | "adPrompt" | "celebration" | "settled" | "rules" | "dailyGift" | "guaranteedIngot";
-type AdAction = "flip" | "addChance";
+type Card = { id: number; symbol: SymbolKey | null; reward: number | null; rewardClaimed: boolean };
+type Overlay = "none" | "adPrompt" | "celebration" | "settled" | "rules" | "dailyGift" | "guaranteedIngot" | "jackpotBoard";
+type AdAction = "flip" | "addChance" | "reward";
+type JackpotRecord = { name: string; time: string };
 type FinalCardState = "winner" | "opened" | "unopened";
 type FlyAnimation = {
   id: number;
@@ -29,6 +30,14 @@ const MAX_CHANCES = 10;
 const DEFAULT_AD_REVENUE = 800;
 const DAILY_STORAGE_KEY = "good-luck-bank-daily-v2";
 const DAILY_CLAIM_STORAGE_KEY = "good-luck-bank-claimed-date-v1";
+const JACKPOT_RECORDS_STORAGE_KEY = "good-luck-bank-jackpot-records-v1";
+const REWARD_CARD_COINS = 200;
+const REWARD_VALUES: Record<SymbolKey, number> = { jade: 100000, ingot: 1000, coin: 600 };
+const DEFAULT_JACKPOT_RECORDS: JackpotRecord[] = [
+  { name: "全***", time: "今天15:32" },
+  { name: "梦***", time: "今天12:18" },
+  { name: "歌***", time: "今天09:46" },
+];
 const BGM_VOLUME = 0.28;
 const DUCKED_BGM_VOLUME = 0.06;
 const WINNER_ROW_DURATION_MS = 3200;
@@ -42,7 +51,7 @@ function SymbolIcon({ kind, small = false }: { kind: SymbolKey; small?: boolean 
 }
 
 function blankCards(): Card[] {
-  return Array.from({ length: 12 }, (_, id) => ({ id, symbol: null }));
+  return Array.from({ length: 12 }, (_, id) => ({ id, symbol: null, reward: null, rewardClaimed: false }));
 }
 
 function todayKey() {
@@ -117,6 +126,7 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
   const [adAction, setAdAction] = useState<AdAction>("flip");
   const [adRevenueNext, setAdRevenueNext] = useState(DEFAULT_AD_REVENUE);
   const [dailyReady, setDailyReady] = useState(false);
+  const [jackpotRecords, setJackpotRecords] = useState<JackpotRecord[]>(DEFAULT_JACKPOT_RECORDS);
   const [adRequests, setAdRequests] = useState(0);
   const [adSuccess, setAdSuccess] = useState(0);
   const [failNext, setFailNext] = useState(false);
@@ -184,6 +194,12 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
       else setOverlay("dailyGift");
     }
     setDailyReady(true);
+    try {
+      const savedRecords = JSON.parse(localStorage.getItem(JACKPOT_RECORDS_STORAGE_KEY) || "null") as JackpotRecord[] | null;
+      if (savedRecords?.length) setJackpotRecords(savedRecords.slice(0, 5));
+    } catch {
+      setJackpotRecords(DEFAULT_JACKPOT_RECORDS);
+    }
   }, [hideEnergy]);
 
   useEffect(() => {
@@ -240,7 +256,7 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
     toastTimerRef.current = window.setTimeout(() => setToast(""), 5000);
   }
 
-  function chooseSymbol(): SymbolKey {
+  function chooseSymbol(effectiveSurplus = dailySurplus): SymbolKey {
     if (nextSymbol !== "random") {
       const chosen = nextSymbol;
       setNextSymbol("random");
@@ -252,7 +268,7 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
       coin: DECK_COPIES_PER_SYMBOL - counts.coin,
     };
     const symbols: SymbolKey[] = ["jade", "ingot", "coin"];
-    const target: SymbolKey = dailySurplus < 5000 ? "coin" : dailySurplus < 500000 ? "ingot" : "jade";
+    const target: SymbolKey = effectiveSurplus < 5000 ? "coin" : effectiveSurplus < 500000 ? "ingot" : "jade";
     const capped = symbols.filter((symbol) => counts[symbol] >= 3 && remaining[symbol] > 0);
     if (capped.length) {
       if (capped.includes(target)) return target;
@@ -272,8 +288,14 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
   }
 
   function clickCard(id: number) {
-    if (overlay !== "none" || winner || cards[id].symbol) return;
+    if (overlay !== "none" || winner || cards[id].symbol || cards[id].rewardClaimed) return;
     unlockBgm();
+    if (cards[id].reward) {
+      setPendingCard(id);
+      setAdAction("reward");
+      setOverlay("adPrompt");
+      return;
+    }
     if (chances >= 1) {
       setChances((value) => Math.max(0, value - 1));
       revealCard(id);
@@ -329,7 +351,15 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
     setAdSuccess((value) => value + 1);
     setDailyAdRevenue((value) => value + adRevenueNext);
     if (adAction === "flip" && pendingCard !== null) {
-      revealCard(pendingCard);
+      revealCard(pendingCard, dailySurplus + adRevenueNext);
+    } else if (adAction === "reward" && pendingCard !== null) {
+      const rewardCardId = pendingCard;
+      setCards((current) => current.map((card) => card.id === rewardCardId ? { ...card, rewardClaimed: true } : card));
+      setSessionCoins((value) => value + REWARD_CARD_COINS);
+      setDailyRewardCost((value) => value + REWARD_CARD_COINS);
+      setPendingCard(null);
+      setOverlay("none");
+      showToast(`奖励牌已领取${REWARD_CARD_COINS}金币`);
     } else {
       setChances((value) => Math.min(MAX_CHANCES, value + 1));
       setOverlay("none");
@@ -337,8 +367,8 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
     }
   }
 
-  function revealCard(cardId: number) {
-    const symbol = chooseSymbol();
+  function revealCard(cardId: number, effectiveSurplus = dailySurplus) {
+    const symbol = chooseSymbol(effectiveSurplus);
     drawHistoryRef.current.push(symbol);
     const nextCount = counts[symbol] + 1;
     const shellRect = shellRef.current?.getBoundingClientRect();
@@ -366,14 +396,35 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
       );
     }
     setSessionCoins((value) => value + 50);
-    setCards((current) => current.map((card) => card.id === cardId ? { ...card, symbol } : card));
+    setDailyRewardCost((value) => value + 50);
+    setCards((current) => {
+      const revealed = current.map((card) => card.id === cardId ? { ...card, symbol } : card);
+      const canCreateRewardCard = nextCount === 3
+        && effectiveSurplus - 50 - REWARD_VALUES[symbol] > REWARD_CARD_COINS
+        && !revealed.some((card) => card.reward !== null);
+      if (!canCreateRewardCard) return revealed;
+      const candidates = revealed.filter((card) => card.symbol === null && card.reward === null && !card.rewardClaimed);
+      if (!candidates.length) return revealed;
+      const chosen = candidates[Math.floor(secureRandom() * candidates.length)];
+      window.setTimeout(() => showToast(`发现${REWARD_CARD_COINS}金币奖励牌！`), 1100);
+      return revealed.map((card) => card.id === chosen.id ? { ...card, reward: REWARD_CARD_COINS } : card);
+    });
     setCounts((current) => ({ ...current, [symbol]: nextCount }));
     setPendingCard(null);
     setOverlay("none");
     showToast("获得50金币!");
     if (nextCount >= 4) {
       setWinner(symbol);
-      setDailyRewardCost((value) => value + (symbol === "jade" ? 100000 : symbol === "ingot" ? 1000 : 600));
+      setDailyRewardCost((value) => value + REWARD_VALUES[symbol]);
+      if (symbol === "jade") {
+        const time = new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
+        const record = { name: "全***", time: `今天${time}` };
+        setJackpotRecords((current) => {
+          const updated = [record, ...current].slice(0, 5);
+          localStorage.setItem(JACKPOT_RECORDS_STORAGE_KEY, JSON.stringify(updated));
+          return updated;
+        });
+      }
       setDebugOpen(false);
       if (symbol !== "jade") {
         playRewardSound(symbol === "ingot" ? "reward-1k.wav" : "reward-600.mp3");
@@ -438,6 +489,9 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
         <div className="ambient ambient-two" />
 
         <header className="bank-header">
+          <button className="jackpot-ticker" onClick={() => setOverlay("jackpotBoard")} disabled={Boolean(winner)}>
+            <b>100K币大奖榜</b><span>恭喜 {jackpotRecords[0].name} 于{jackpotRecords[0].time}获得100K币大奖！</span>
+          </button>
           <button className="round-tool rules-tool" onClick={() => setOverlay("rules")} disabled={Boolean(winner)} aria-label="查看规则">?</button>
           <div className="roof roof-left" />
           <div className="roof roof-right" />
@@ -478,16 +532,19 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
         <section className="card-grid" aria-label="幸运卡牌">
           {cards.map((card) => (
             <button
-              className={`flip-card ${card.symbol ? "is-open" : ""} ${winner && card.symbol === winner ? "winning-card" : ""}`}
+              className={`flip-card ${card.symbol || card.rewardClaimed ? "is-open" : ""} ${card.reward && !card.rewardClaimed ? "is-reward-card" : ""} ${winner && card.symbol === winner ? "winning-card" : ""}`}
               key={card.id}
               ref={(node) => { cardRefs.current[card.id] = node; }}
               onClick={() => clickCard(card.id)}
-              disabled={Boolean(card.symbol) || Boolean(winner) || overlay !== "none"}
-              aria-label={card.symbol ? `已翻出${SYMBOLS[card.symbol].name}` : `翻开第${card.id + 1}张卡牌`}
+              disabled={Boolean(card.symbol) || card.rewardClaimed || Boolean(winner) || overlay !== "none"}
+              aria-label={card.symbol ? `已翻出${SYMBOLS[card.symbol].name}` : card.reward ? `${REWARD_CARD_COINS}金币奖励牌` : `翻开第${card.id + 1}张卡牌`}
             >
               <span className="card-inner">
-                <span className="card-back" />
-                <span className="card-front">{card.symbol && <SymbolIcon kind={card.symbol} />}</span>
+                <span className="card-back">{card.reward && !card.rewardClaimed && <span className="reward-card-label"><b>奖励牌</b><strong>{card.reward}</strong><small>金币</small></span>}</span>
+                <span className="card-front">
+                  {card.symbol && <SymbolIcon kind={card.symbol} />}
+                  {card.rewardClaimed && <span className="reward-card-result"><img src="/assets/game/coin-large.png" alt="" /><strong>200</strong><small>金币</small></span>}
+                </span>
               </span>
             </button>
           ))}
@@ -505,6 +562,7 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
               </select>
             </label>
             <label>单条广告收益<input type="number" min="0" value={adRevenueNext} onChange={(event) => setAdRevenueNext(Math.max(0, Number(event.target.value) || 0))} /></label>
+            <label>个人奖励池盈余<input type="number" value={dailySurplus} onChange={(event) => setDailyAdRevenue(dailyRewardCost + (Number(event.target.value) || 0))} /></label>
             <button className="debug-highlight" onClick={enableHighValueDemo}>模拟高价值用户</button>
             <button className={failNext ? "debug-danger active" : "debug-danger"} onClick={() => setFailNext(true)}>下一次广告失败</button>
             <button onClick={resetAllData}>重置所有数据</button>
@@ -553,8 +611,8 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
                   <img src="/assets/game/close.png" alt="" />
                 </button>
                 <div className="coin-stack" />
-                <h2>{adAction === "flip" ? <>看广告翻转卡牌<br />并领取50金币！</> : <>完整观看广告<br />翻牌次数+1</>}</h2>
-                <button className="primary-button image-button" onClick={startAd}>{adAction === "flip" ? <img src="/assets/game/button-text-flip.png" alt="翻转卡牌" /> : "看广告 +1次"}</button>
+                <h2>{adAction === "flip" ? <>看广告翻转卡牌<br />并领取50金币！</> : adAction === "reward" ? <>看广告翻开奖励牌<br />领取200金币！</> : <>完整观看广告<br />翻牌次数+1</>}</h2>
+                <button className="primary-button image-button" onClick={startAd}>{adAction === "flip" ? <img src="/assets/game/button-text-flip.png" alt="翻转卡牌" /> : adAction === "reward" ? "领取200金币" : "看广告 +1次"}</button>
               </div>
             )}
             {overlay === "settled" && winner && (
@@ -600,6 +658,7 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
                   )}
                   <li>每次有效翻牌必得50金币。</li>
                   <li>同一种图案累计4个即可获得对应大奖，无需连续出现。</li>
+                  <li>图案首次集齐3个且奖励池余额充足时，场上会出现200金币奖励牌；看广告领取后不增加图案。</li>
                   <li>广告失败或中断时，不消耗卡牌，也不会发放奖励。</li>
                 </ol>
                 <button className="primary-button" onClick={() => setOverlay("none")}>我知道了</button>
@@ -618,6 +677,18 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
                 <SymbolIcon kind="ingot" />
                 <h2>下一次必得金元宝</h2>
                 <button className="primary-button" onClick={() => setOverlay("none")}>立即翻牌</button>
+              </div>
+            )}
+            {overlay === "jackpotBoard" && (
+              <div className="modal jackpot-board-modal">
+                <h2>100K币大奖榜</h2>
+                <p>大奖已成功发放</p>
+                <ol>
+                  {jackpotRecords.map((record, index) => (
+                    <li key={`${record.name}-${record.time}-${index}`}><span>{record.name}</span><time>{record.time}</time><strong>100K币</strong></li>
+                  ))}
+                </ol>
+                <button className="primary-button" onClick={() => setOverlay("none")}>我知道了</button>
               </div>
             )}
           </div>
