@@ -1,0 +1,1 @@
+import{r as e}from"./framework-CXnKph_e.js";import t from"./page-C5qwvvQf.js";var n=e();function r(){return(0,n.jsx)(t,{hideEnergy:!0})}export{r as default};
