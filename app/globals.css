@@ -389,8 +389,57 @@ button { -webkit-tap-highlight-color: transparent; }
 .card-back::before, .card-back i { display: none; }
 .card-front { background-image: url("/assets/game/card-front.png"); }
 .flip-card.is-reward-card .card-back {
-  filter: saturate(1.18) brightness(1.03) drop-shadow(0 0 7px rgba(255,215,72,.9));
-  animation: rewardCardPulse .85s ease-in-out infinite alternate;
+  filter: drop-shadow(0 5px 5px rgba(51,43,34,.45));
+  touch-action: none;
+  user-select: none;
+}
+.reward-lock-layer {
+  --scratch-progress: 0%;
+  position: absolute;
+  inset: 5px;
+  z-index: 3;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 7px;
+  overflow: hidden;
+  border: 2px solid #77726a;
+  border-radius: 9px;
+  color: #f4eee3;
+  background:
+    linear-gradient(105deg, transparent calc(var(--scratch-progress) - 22%), rgba(255,255,255,.3) var(--scratch-progress), transparent calc(var(--scratch-progress) + 18%)),
+    linear-gradient(145deg, #aaa69e, #66635e 58%, #96928b);
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.2), inset 0 -8px 14px rgba(36,32,28,.26);
+}
+.reward-lock-layer strong { font-size: clamp(12px, 3.3vw, 16px); letter-spacing: .08em; text-shadow: 0 1px 2px #3c3935; }
+.reward-lock {
+  position: relative;
+  width: 31px;
+  height: 25px;
+  border-radius: 5px;
+  background: linear-gradient(#eee9df, #aaa59c);
+  box-shadow: 0 2px 4px rgba(32,29,26,.42);
+}
+.reward-lock::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: -18px;
+  width: 15px;
+  height: 19px;
+  border: 4px solid #d6d1c8;
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+}
+.reward-lock::after {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 8px;
+  width: 5px;
+  height: 9px;
+  border-radius: 5px;
+  background: #5a5650;
 }
 .reward-card-label, .reward-card-result {
   position: relative; z-index: 2; display: grid; place-items: center; color: #7b360d; line-height: 1;

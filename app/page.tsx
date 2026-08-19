@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 
 type SymbolKey = "jade" | "ingot" | "coin";
 type Card = { id: number; symbol: SymbolKey | null; reward: number | null; rewardClaimed: boolean };
@@ -135,6 +135,7 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
   const [toast, setToast] = useState("");
   const [toastId, setToastId] = useState(0);
   const [flyAnimation, setFlyAnimation] = useState<FlyAnimation | null>(null);
+  const [scratchProgress, setScratchProgress] = useState<Record<number, number>>({});
   const shellRef = useRef<HTMLElement | null>(null);
   const cardRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const slotRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -146,6 +147,8 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
   const celebrationTimerRef = useRef<number | null>(null);
   const flyIdRef = useRef(0);
   const drawHistoryRef = useRef<SymbolKey[]>([]);
+  const scratchRef = useRef<{ cardId: number; x: number; y: number } | null>(null);
+  const scratchPromptedRef = useRef<number | null>(null);
 
   const flips = useMemo(() => cards.filter((card) => card.symbol).length, [cards]);
   const dailySurplus = dailyAdRevenue - dailyRewardCost;
@@ -291,6 +294,10 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
     if (overlay !== "none" || winner || cards[id].symbol || cards[id].rewardClaimed) return;
     unlockBgm();
     if (cards[id].reward) {
+      if ((scratchProgress[id] || 0) < 100) {
+        showToast("左右擦一擦，解锁新奖励");
+        return;
+      }
       setPendingCard(id);
       setAdAction("reward");
       setOverlay("adPrompt");
@@ -304,6 +311,36 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
     setPendingCard(id);
     setAdAction("flip");
     setOverlay("adPrompt");
+  }
+
+  function beginScratch(cardId: number, event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!cards[cardId].reward || cards[cardId].rewardClaimed || overlay !== "none" || winner) return;
+    scratchRef.current = { cardId, x: event.clientX, y: event.clientY };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function continueScratch(cardId: number, event: ReactPointerEvent<HTMLButtonElement>) {
+    const active = scratchRef.current;
+    if (!active || active.cardId !== cardId) return;
+    const distance = Math.hypot(event.clientX - active.x, event.clientY - active.y);
+    if (distance < 3) return;
+    scratchRef.current = { cardId, x: event.clientX, y: event.clientY };
+    setScratchProgress((current) => {
+      const next = Math.min(100, (current[cardId] || 0) + distance * 1.35);
+      if (next >= 100 && scratchPromptedRef.current !== cardId) {
+        scratchPromptedRef.current = cardId;
+        window.setTimeout(() => {
+          setPendingCard(cardId);
+          setAdAction("reward");
+          setOverlay("adPrompt");
+        }, 180);
+      }
+      return { ...current, [cardId]: next };
+    });
+  }
+
+  function endScratch(cardId: number) {
+    if (scratchRef.current?.cardId === cardId) scratchRef.current = null;
   }
 
   function requestAddChance() {
@@ -454,6 +491,9 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
     stopFlipSound();
     stopRewardSound();
     setCards(blankCards());
+    setScratchProgress({});
+    scratchRef.current = null;
+    scratchPromptedRef.current = null;
     setCounts({ jade: 0, ingot: 0, coin: 0 });
     setOverlay("none");
     setPendingCard(null);
@@ -536,11 +576,28 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
               key={card.id}
               ref={(node) => { cardRefs.current[card.id] = node; }}
               onClick={() => clickCard(card.id)}
+              onPointerDown={(event) => beginScratch(card.id, event)}
+              onPointerMove={(event) => continueScratch(card.id, event)}
+              onPointerUp={() => endScratch(card.id)}
+              onPointerCancel={() => endScratch(card.id)}
               disabled={Boolean(card.symbol) || card.rewardClaimed || Boolean(winner) || overlay !== "none"}
               aria-label={card.symbol ? `已翻出${SYMBOLS[card.symbol].name}` : card.reward ? `${REWARD_CARD_COINS}金币奖励牌` : `翻开第${card.id + 1}张卡牌`}
             >
               <span className="card-inner">
-                <span className="card-back">{card.reward && !card.rewardClaimed && <span className="reward-card-label"><b>奖励牌</b><strong>{card.reward}</strong><small>金币</small></span>}</span>
+                <span className="card-back">
+                  {card.reward && !card.rewardClaimed && (
+                    <span
+                      className="reward-lock-layer"
+                      style={{
+                        "--scratch-progress": `${scratchProgress[card.id] || 0}%`,
+                        opacity: Math.max(.12, 1 - (scratchProgress[card.id] || 0) / 118),
+                      } as CSSProperties}
+                    >
+                      <span className="reward-lock" aria-hidden="true" />
+                      <strong>擦一擦</strong>
+                    </span>
+                  )}
+                </span>
                 <span className="card-front">
                   {card.symbol && <SymbolIcon kind={card.symbol} />}
                   {card.rewardClaimed && <span className="reward-card-result"><img src="/assets/game/coin-large.png" alt="" /><strong>200</strong><small>金币</small></span>}
@@ -611,7 +668,7 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
                   <img src="/assets/game/close.png" alt="" />
                 </button>
                 <div className="coin-stack" />
-                <h2>{adAction === "flip" ? <>看广告翻转卡牌<br />并领取50金币！</> : adAction === "reward" ? <>看广告翻开奖励牌<br />领取200金币！</> : <>完整观看广告<br />翻牌次数+1</>}</h2>
+                <h2>{adAction === "flip" ? <>看广告翻转卡牌<br />并领取50金币！</> : adAction === "reward" ? <>解锁成功<br />看广告领取200金币！</> : <>完整观看广告<br />翻牌次数+1</>}</h2>
                 <button className="primary-button image-button" onClick={startAd}>{adAction === "flip" ? <img src="/assets/game/button-text-flip.png" alt="翻转卡牌" /> : adAction === "reward" ? "领取200金币" : "看广告 +1次"}</button>
               </div>
             )}
@@ -658,7 +715,7 @@ export default function Home({ hideEnergy = false }: { hideEnergy?: boolean }) {
                   )}
                   <li>每次有效翻牌必得50金币。</li>
                   <li>同一种图案累计4个即可获得对应大奖，无需连续出现。</li>
-                  <li>图案首次集齐3个且奖励池余额充足时，场上会出现200金币奖励牌；看广告领取后不增加图案。</li>
+                  <li>图案首次集齐3个且奖励池余额充足时，一张卡牌会变为灰色锁定状态；擦开并看广告可领取200金币，不增加图案。</li>
                   <li>广告失败或中断时，不消耗卡牌，也不会发放奖励。</li>
                 </ol>
                 <button className="primary-button" onClick={() => setOverlay("none")}>我知道了</button>
